@@ -26,10 +26,10 @@ Both perspectives are needed.
 ### Phase 1 Files (in PS outreach-agents project)
 
 Phase 1 was built inside the PS outreach agents project as a proof of concept:
-- `~/Playful Sincerity/playful-sincerity-agents/outreach-agents/agents/*/prompt.md` — Agent prompts with YAML frontmatter (source of truth)
-- `~/Playful Sincerity/playful-sincerity-agents/outreach-agents/scripts/generate-architecture.py` — Generator script
-- `~/Playful Sincerity/playful-sincerity-agents/outreach-agents/outputs/demo/agent-architecture.svg` — Generated SVG
-- `~/Playful Sincerity/playful-sincerity-agents/outreach-agents/docs/agent-registry.md` — Generated registry
+- `~/Playful Sincerity/PS Media/playful-sincerity-agents/outreach-agents/agents/*/prompt.md` — Agent prompts with YAML frontmatter (source of truth)
+- `~/Playful Sincerity/PS Media/playful-sincerity-agents/outreach-agents/scripts/generate-architecture.py` — Generator script
+- `~/Playful Sincerity/PS Media/playful-sincerity-agents/outreach-agents/outputs/demo/agent-architecture.svg` — Generated SVG
+- `~/Playful Sincerity/PS Media/playful-sincerity-agents/outreach-agents/docs/agent-registry.md` — Generated registry
 
 ## Working Conventions
 
@@ -41,14 +41,14 @@ Phase 1 was built inside the PS outreach agents project as a proof of concept:
 ## How to Regenerate (Phase 1 — PS Outreach Agents)
 
 ```bash
-cd ~/Playful\ Sincerity/playful-sincerity-agents
+cd ~/Playful\ Sincerity/PS\ Media/playful-sincerity-agents
 python3 outreach-agents/scripts/generate-architecture.py
 ```
 
 ## Cross-References
 
-- **PS Outreach Agents** (`~/Playful Sincerity/playful-sincerity-agents/`): First consumer of the spatial workspace pattern.
-- **RenMap** (`~/Playful Sincerity/RenMap/`): Shares the spatial-interface philosophy. Both are about replacing linear/algorithmic interfaces with browsable 2D canvases.
+- **PS Outreach Agents** (`~/Playful Sincerity/PS Media/playful-sincerity-agents/`): First consumer of the spatial workspace pattern.
+- **RenMap** (`~/Playful Sincerity/PS Software/RenMap/`): Shares the spatial-interface philosophy. Both are about replacing linear/algorithmic interfaces with browsable 2D canvases.
 - **SPEC.md**: Contains full lessons learned from previous visualization approaches (ASCII, Miro, hand-crafted SVG, generated SVG).
 
 ## Gotchas
