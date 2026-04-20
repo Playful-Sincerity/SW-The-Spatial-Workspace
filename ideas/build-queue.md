@@ -80,6 +80,7 @@ Running log of ideas Wisdom surfaces during live work that we can't address in t
 **Rough shape:**
 - Reuse existing search UI (\u2318F) but with a "within this folder" scope toggle (or auto-scope when invoked from inside a bag's view).
 - On result click: auto-expand intermediate directories + center canvas on the target. Uses existing `centerOnFileWithParent` / expansion infrastructure.
+- **Menu placement (confirmed 2026-04-19):** This lives in the folder right-click drop-down menu alongside "Expand children" (Bulk-expand entry) and "List view" (List-view entry). All three are folder-scoped actions that share the same right-click surface — when you build the menu, build all three together as a folder-actions cluster.
 
 ---
 
@@ -244,6 +245,27 @@ Running log of ideas Wisdom surfaces during live work that we can't address in t
 - Handles the "how many leaves are too many to show readably at this zoom" question implicitly: at far zoom-out, leaves shrink and parents grow, so the visual weight auto-shifts to what's actually legible.
 - Tune curve so the transitions feel smooth, not jumpy — probably a log or piecewise curve, not linear.
 - Related: likely pairs with leaf-hiding or leaf-fade-out at extreme zoom-out (complement: leaves aren't just small, they may disappear, leaving clean parent-folder landscape for orientation).
+
+---
+
+### 2026-04-19 — Whole-workspace performance pass (avoid crashing people's machines)
+
+**Context:** Build-queue capture session. Umbrella/theme entry — not a single feature, a performance budget conversation we need to have before Spatial Workspace is share-able beyond Wisdom's own machine.
+**Idea:** Full-ecosystem render is currently slow enough that it will likely crash less-powerful machines, and animations feel laggy at that scale. Seeing the whole workspace at once is an edge case (not the common mode), but it's the *demo* moment — the "wow, here's my whole system" view — so it needs to at least not tank. Goal: fast load at full-ecosystem scale, smoother animations, graceful degradation when the tree is very large.
+**Why it matters:** Two audiences bitten by this — (1) Wisdom doing his own full-ecosystem work loses flow every time the canvas stutters, (2) anyone he shares this with will form their first impression on render speed. Slow = feels toy-like. Fast = feels real. Also gates several other queued ideas (live reorganization UI, live context dashboard, tier-by-tier expand, progressive zoom-sizing) — all of those assume the canvas is fast enough to re-run/re-size interactively.
+**Directions Wisdom surfaced:**
+- **Procedural/lazy generation** — don't render what isn't visible. Only build DOM/SVG/canvas elements for nodes in the viewport (or about to enter it); destroy or recycle off-screen.
+- **Smoother animations** — debug what's stuttering. Could be layout recomputation on every frame, could be too many DOM nodes, could be SVG vs. canvas tradeoff.
+- **"Whole-workspace isn't the common mode"** — so aggressive culling at extreme zoom-out is acceptable. Leaves can disappear entirely past a certain zoom threshold; just show parents. Pairs with the zoom-coupled parent sizing entry.
+**Rough shape / areas to investigate when we dig in:**
+- Viewport culling: only render nodes within (visible bbox + margin). Measure what % of 900+ nodes are actually visible at any given zoom.
+- Level-of-detail (LOD) system: at far zoom, parents rendered as simple shapes, leaves hidden or batched into single aggregate markers; at close zoom, full fidelity.
+- Rendering backend question: SVG vs. Canvas vs. WebGL. SVG is easy but slow at 900+ nodes with animations. Canvas scales better. WebGL (PixiJS, regl, etc.) scales to tens of thousands if needed. Worth benchmarking before committing.
+- Layout recomputation: how often does the tree re-layout? Can we incrementalize so expanding one folder only recomputes its subtree, not the whole canvas?
+- Animation frame budget: profile what's happening per frame during expand/collapse. May be one expensive operation hiding in the loop.
+- Debounce/coalesce: multiple rapid state changes (e.g. watch-server regenerations, quick clicks) should batch into one layout pass, not N.
+- Preload + warm cache: first-paint speed matters for the demo moment.
+**Status:** Theme entry, not a single-session build. When Wisdom is ready to tackle this, it probably deserves its own `ideas/YYYY-MM-DD-performance-pass.md` exploration doc and a benchmark harness before any specific fix — measure first, optimize with evidence.
 
 ---
 

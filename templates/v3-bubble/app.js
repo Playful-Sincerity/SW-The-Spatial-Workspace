@@ -156,6 +156,45 @@ function nodeVisual(d) {
   };
 }
 
+// ── Zoom-Coupled Sizing (tier-respective) ─────────────────────────────
+// As zoom shrinks, ancestor folders grow so they stay legible and provide
+// wayfinding cues. Visual transform only — d3.pack positions are fixed.
+// Inverse-zoom formula: `factor / k` keeps on-screen size roughly constant
+// as the user zooms out. tierFactors[depth] controls how much each tier
+// grows; lower = grows less. The cap on max-scale prevents runaway sizes
+// at very far zoom (otherwise root goes 100× and overlaps everything).
+const ZOOM_SIZING = {
+  threshold: 0.6,    // no scaling above this zoom (normal stays normal)
+  maxScale:  15,     // cap so very-far-zoom doesn't explode world-space size
+  tierFactors: [0.60, 0.56, 0.42, 0.31, 0.22, 0.16, 0.12, 0.085],
+};
+
+function zoomCoupledScale(d, k) {
+  if (!d || d.data.type !== "directory") return 1;
+  if (k >= ZOOM_SIZING.threshold) return 1;
+  const tf = ZOOM_SIZING.tierFactors;
+  const factor = tf[Math.min(d.depth, tf.length - 1)];
+  // Ramp from scale=1 at k=threshold, growing as 1/k below.
+  const raw = factor / k - factor / ZOOM_SIZING.threshold + 1;
+  return Math.min(ZOOM_SIZING.maxScale, Math.max(1, raw));
+}
+
+function applyZoomCoupledSizing(k) {
+  if (!g) return;
+  const nodes = g.selectAll(".node");
+  nodes.each(function(d) {
+    if (!d) return;
+    const s = zoomCoupledScale(d, k);
+    const base = `translate(${d.x},${d.y})`;
+    const tf = s === 1 ? base : `${base} scale(${s})`;
+    this.setAttribute("transform", tf);
+  });
+  // Z-order: shallower nodes render on top so ancestors always overlap
+  // descendants ("by tier, the layers of how it's displayed"). d3's .sort()
+  // reorders the DOM in place — deepest nodes go first, root last.
+  nodes.sort((a, b) => (b.depth || 0) - (a.depth || 0));
+}
+
 // ── Layout Engine (v3-bubble — Recursive Circle Packing via d3.pack) ──
 // Wisdom's bubble model: each folder + its immediate children forms an
 // implicit "bubble" (never drawn). Children pack tangent inside the
@@ -530,6 +569,7 @@ function renderTree() {
   setupTrackpadGestures(svg, zoomBehavior);
   zoomBehavior.on("zoom", (event) => {
     outerG.attr("transform", event.transform);
+    applyZoomCoupledSizing(event.transform.k);
   });
   svg.call(zoomBehavior);
 
@@ -799,6 +839,15 @@ async function updateTree({ isResettle = false } = {}) {
 
   state.layoutRoot = root;
   renderLayout(root, { animate: !_firstRender });
+
+  // Re-apply zoom-coupled sizing after the transition starts so the
+  // translate(x,y) written by the transition gets a scale component too.
+  // Without this, ancestors snap back to natural size on every expand/collapse
+  // until the next zoom event. Runs on the transition-end frame and again
+  // after animation completes for safety.
+  const currentK = svg ? d3.zoomTransform(svg.node()).k : 1;
+  requestAnimationFrame(() => applyZoomCoupledSizing(currentK));
+  setTimeout(() => applyZoomCoupledSizing(svg ? d3.zoomTransform(svg.node()).k : 1), ANIM_DURATION + 40);
 
   if (_firstRender) {
     _firstRender = false;
