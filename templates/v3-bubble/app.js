@@ -48,6 +48,7 @@ const state = {
   activeTabIndex: -1,
   readerMinimized: false,
   layoutRoot: null,  // latest d3.hierarchy root (post-settle), for re-seed on expand
+  maxTierExpanded: 1,  // tier+/- counter; N = expand every dir at depth < N
 };
 
 // ── Constants ─────────────────────────────────────────────────────────
@@ -56,7 +57,7 @@ const state = {
 // children stay collapsed so the cold-open screen is deliberately quiet.
 const INITIAL_EXPAND_DEPTH = 1;
 const INITIAL_EXPAND_BAG_THRESHOLD = 40;
-const ANIM_DURATION = 180;
+const ANIM_DURATION = 480;
 
 // Phase (from project-status.yaml) → activity heat token. Phase describes
 // project state; heat describes visual temperature. The mapping is ordinal:
@@ -306,7 +307,9 @@ function init() {
   }
 
   flattenTree(TREE, "");
+  computeTreeMaxDirDepth();
   setInitialExpanded(TREE, 0, INITIAL_EXPAND_DEPTH);
+  state.maxTierExpanded = INITIAL_EXPAND_DEPTH;
 
   const totalFiles = state.flatNodes.filter(n => n.type === "file").length;
   const totalDirs = state.flatNodes.filter(n => n.type === "directory").length;
@@ -561,7 +564,28 @@ function setupTrackpadGestures(svgSel, zoomB) {
 function fitToView() {
   if (!g) return;
   try {
-    const bbox = g.node().getBBox();
+    // Prefer target-layout extent (computed positions) over live DOM bbox.
+    // During a collapse transition, exit-selection nodes still occupy their
+    // old (far-out) positions in the DOM — getBBox() would over-report, and
+    // the viewport would zoom out instead of in. Layout data is already at
+    // the NEW positions, so the fit is accurate even mid-transition.
+    let bbox = null;
+    if (state.layoutRoot) {
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const d of state.layoutRoot.descendants()) {
+        if (!isFinite(d.x) || !isFinite(d.y)) continue;
+        const hw = (d.width || 0) / 2;
+        const hh = (d.height || 0) / 2;
+        if (d.x - hw < minX) minX = d.x - hw;
+        if (d.x + hw > maxX) maxX = d.x + hw;
+        if (d.y - hh < minY) minY = d.y - hh;
+        if (d.y + hh > maxY) maxY = d.y + hh;
+      }
+      if (isFinite(minX) && isFinite(maxX)) {
+        bbox = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+      }
+    }
+    if (!bbox) bbox = g.node().getBBox();
     const container = document.getElementById("canvas");
     const w = container.clientWidth;
     const h = container.clientHeight;
@@ -584,7 +608,10 @@ function fitToView() {
     const ty = h / 2 - (gTy + bboxCy) * scale;
 
     const transform = d3.zoomIdentity.translate(tx, ty).scale(scale);
-    svg.transition().duration(320).call(zoomBehavior.transform, transform);
+    // Slightly exceed ANIM_DURATION so the viewport lands just after the
+    // layout settles — otherwise the zoom finishes first and the final
+    // layout frames look like they're "catching up" to the framing.
+    svg.transition().duration(ANIM_DURATION + 80).call(zoomBehavior.transform, transform);
   } catch (e) { /* getBBox can throw on fresh SVGs */ }
 }
 
@@ -932,23 +959,24 @@ function renderLayout(root, { animate = true } = {}) {
 function attachNodeHandlers(selection) {
   selection.on("click", async (event, d) => {
     event.stopPropagation();
+    event.preventDefault();
     const clickedPath = d.data.path;
     if (d.data.type === "directory" && d.data._hasChildren) {
+      if (event.metaKey || event.ctrlKey) {
+        await advanceSubtreeOneTierAndRender(clickedPath);
+        return;
+      }
+      if (event.shiftKey) {
+        await retreatSubtreeOneTierAndRender(clickedPath);
+        return;
+      }
       const wasExpanded = state.expandedPaths.has(clickedPath);
-      if (wasExpanded) {
-        state.expandedPaths.delete(clickedPath);
-      } else {
-        state.expandedPaths.add(clickedPath);
-      }
+      if (wasExpanded) state.expandedPaths.delete(clickedPath);
+      else state.expandedPaths.add(clickedPath);
       await updateTree();
-      // When expanding: zoom/pan so the folder AND its children are all
-      // visible. When collapsing: just recenter on the folder itself —
-      // there are no children to fit.
-      if (wasExpanded) {
-        centerOnNode(clickedPath);
-      } else {
-        centerOnNodeWithChildren(clickedPath);
-      }
+      if (wasExpanded) centerOnNode(clickedPath);
+      else centerOnNodeWithChildren(clickedPath);
+      updateTierButtons();
     } else if (d.data.type === "file") {
       openFile(d.data);
     }
@@ -974,6 +1002,274 @@ function attachNodeHandlers(selection) {
   selection.on("mouseleave", () => {
     document.getElementById("tooltip").style.display = "none";
   });
+
+  selection.on("contextmenu", (event, d) => {
+    event.preventDefault();
+    event.stopPropagation();
+    document.getElementById("tooltip").style.display = "none";
+    showNodeContextMenu(event, d);
+  });
+}
+
+// ── Node Context Menu ─────────────────────────────────────────────────
+// Right-click on a node → custom menu instead of the browser default.
+// Options are node-type-aware (directory vs file). Starter set mirrors the
+// tier +/- primitives at the node level, per the 2026-04-19 build-queue
+// bulk-expand entry. Expected to grow as Wisdom iterates.
+function buildContextMenuItems(d) {
+  const items = [];
+  const isDir = d.data.type === "directory" && d.data._hasChildren;
+  const isExpanded = state.expandedPaths.has(d.data.path);
+  const isFile = d.data.type === "file";
+
+  if (isDir) {
+    items.push({
+      label: "Expand one tier",
+      hint: "⌘-click",
+      action: () => advanceSubtreeOneTierAndRender(d.data.path),
+    });
+    items.push({
+      label: "Collapse one tier",
+      hint: "⇧-click",
+      disabled: !isExpanded,
+      action: () => retreatSubtreeOneTierAndRender(d.data.path),
+    });
+    items.push({
+      label: "Expand fully",
+      action: () => expandSubtreeFully(d.data.path),
+    });
+    items.push({
+      label: "Collapse fully",
+      disabled: !isExpanded,
+      action: () => collapseSubtree(d.data.path),
+    });
+    items.push({ separator: true });
+  }
+
+  if (isFile) {
+    items.push({
+      label: "Open in reader",
+      action: () => openFile(d.data),
+    });
+    items.push({ separator: true });
+  }
+
+  items.push({
+    label: "Copy path",
+    action: async () => {
+      try { await navigator.clipboard.writeText(d.data.path); } catch (_) {}
+    },
+  });
+
+  return items;
+}
+
+function showNodeContextMenu(event, d) {
+  const menu = document.getElementById("context-menu");
+  if (!menu) return;
+  const items = buildContextMenuItems(d);
+  menu.innerHTML = "";
+
+  const header = document.createElement("div");
+  header.className = "sw-context-header";
+  header.textContent = d.data.name;
+  menu.appendChild(header);
+
+  for (const item of items) {
+    if (item.separator) {
+      const sep = document.createElement("div");
+      sep.className = "sw-context-sep";
+      menu.appendChild(sep);
+      continue;
+    }
+    const row = document.createElement("div");
+    row.className = "sw-context-item";
+    row.setAttribute("role", "menuitem");
+    if (item.disabled) row.setAttribute("aria-disabled", "true");
+
+    const label = document.createElement("span");
+    label.className = "sw-context-label";
+    label.textContent = item.label;
+    row.appendChild(label);
+
+    if (item.hint) {
+      const hint = document.createElement("span");
+      hint.className = "sw-context-hint";
+      hint.textContent = item.hint;
+      row.appendChild(hint);
+    }
+
+    if (!item.disabled) {
+      row.addEventListener("click", (e) => {
+        e.stopPropagation();
+        closeNodeContextMenu();
+        try { item.action(); } catch (err) { console.error(err); }
+      });
+    }
+    menu.appendChild(row);
+  }
+
+  // Pre-position offscreen to measure, then clamp into viewport.
+  menu.style.left = "-9999px";
+  menu.style.top = "-9999px";
+  menu.classList.add("open");
+  menu.setAttribute("aria-hidden", "false");
+  const rect = menu.getBoundingClientRect();
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  let x = event.clientX;
+  let y = event.clientY;
+  if (x + rect.width + 8 > vw) x = Math.max(8, vw - rect.width - 8);
+  if (y + rect.height + 8 > vh) y = Math.max(8, vh - rect.height - 8);
+  menu.style.left = x + "px";
+  menu.style.top = y + "px";
+}
+
+function closeNodeContextMenu() {
+  const menu = document.getElementById("context-menu");
+  if (!menu) return;
+  menu.classList.remove("open");
+  menu.setAttribute("aria-hidden", "true");
+}
+
+// Progressive left-click: each click drills one more tier into the subtree
+// rooted at folderPath. Mirrors the global tier+ primitive scoped to a
+// subtree. Returns true if anything changed. First click on a collapsed
+// folder just expands it; each subsequent click catches the whole subtree
+// up to `currentTier + 1`, so asymmetrically expanded branches get filled
+// in as the tree drills down. No collapse on click — that's right-click.
+function advanceSubtreeOneTier(folderPath) {
+  const folder = findCanonicalNode(TREE, folderPath);
+  if (!folder || folder.type !== "directory") return false;
+
+  if (!state.expandedPaths.has(folderPath)) {
+    state.expandedPaths.add(folderPath);
+    return true;
+  }
+
+  let maxRelDepth = 0;
+  (function walk(n, relDepth) {
+    if (n.type !== "directory") return;
+    if (state.expandedPaths.has(n.path) && relDepth > maxRelDepth) maxRelDepth = relDepth;
+    if (n.children) for (const c of n.children) walk(c, relDepth + 1);
+  })(folder, 0);
+
+  const nextTier = maxRelDepth + 2;
+  let added = 0;
+  (function walk(n, relDepth) {
+    if (n.type !== "directory") return;
+    if (relDepth < nextTier && !state.expandedPaths.has(n.path)) {
+      state.expandedPaths.add(n.path);
+      added++;
+    }
+    if (n.children) for (const c of n.children) walk(c, relDepth + 1);
+  })(folder, 0);
+
+  return added > 0;
+}
+
+// Mirror of advanceSubtreeOneTier — undo one tier of expansion at a time.
+// At the deepest expanded relDepth, drop every dir at that depth. When only
+// the folder itself remains, one more call collapses the folder.
+function retreatSubtreeOneTier(folderPath) {
+  const folder = findCanonicalNode(TREE, folderPath);
+  if (!folder || folder.type !== "directory") return false;
+  if (!state.expandedPaths.has(folderPath)) return false;
+
+  let maxRelDepth = 0;
+  (function walk(n, relDepth) {
+    if (n.type !== "directory") return;
+    if (state.expandedPaths.has(n.path) && relDepth > maxRelDepth) maxRelDepth = relDepth;
+    if (n.children) for (const c of n.children) walk(c, relDepth + 1);
+  })(folder, 0);
+
+  let removed = 0;
+  (function walk(n, relDepth) {
+    if (n.type !== "directory") return;
+    if (relDepth === maxRelDepth && state.expandedPaths.has(n.path)) {
+      state.expandedPaths.delete(n.path);
+      removed++;
+    }
+    if (n.children) for (const c of n.children) walk(c, relDepth + 1);
+  })(folder, 0);
+
+  return removed > 0;
+}
+
+async function retreatSubtreeOneTierAndRender(folderPath) {
+  const didChange = retreatSubtreeOneTier(folderPath);
+  if (!didChange) return;
+  _prevPositions = new Map();
+  await updateTree({ isResettle: true });
+  requestAnimationFrame(() => fitToView());
+  updateTierButtons();
+}
+
+async function expandSubtreeFully(folderPath) {
+  const folder = findCanonicalNode(TREE, folderPath);
+  if (!folder) return;
+  let added = 0;
+  (function walk(n) {
+    if (n.type === "directory" && (n.children && n.children.length) && !state.expandedPaths.has(n.path)) {
+      state.expandedPaths.add(n.path);
+      added++;
+    }
+    if (n.children) for (const c of n.children) walk(c);
+  })(folder);
+  if (!added) return;
+  _prevPositions = new Map();
+  await updateTree({ isResettle: true });
+  requestAnimationFrame(() => fitToView());
+  updateTierButtons();
+}
+
+async function advanceSubtreeOneTierAndRender(folderPath) {
+  const didChange = advanceSubtreeOneTier(folderPath);
+  if (!didChange) return;
+  _prevPositions = new Map();
+  await updateTree({ isResettle: true });
+  requestAnimationFrame(() => fitToView());
+  updateTierButtons();
+}
+
+async function expandSubtreeOneTier(folderPath) {
+  const node = state.flatNodes.find(n => n.path === folderPath);
+  if (!node) return;
+  state.expandedPaths.add(folderPath);
+  const canonical = findCanonicalNode(TREE, folderPath);
+  if (canonical && canonical.children) {
+    for (const c of canonical.children) {
+      if (c.type === "directory") state.expandedPaths.add(c.path);
+    }
+  }
+  _prevPositions = new Map();
+  await updateTree({ isResettle: true });
+  centerOnNodeWithChildren(folderPath);
+  updateTierButtons();
+}
+
+async function collapseSubtree(folderPath) {
+  const canonical = findCanonicalNode(TREE, folderPath);
+  if (!canonical) return;
+  (function walk(n) {
+    if (n.type === "directory") state.expandedPaths.delete(n.path);
+    if (n.children) for (const c of n.children) walk(c);
+  })(canonical);
+  _prevPositions = new Map();
+  await updateTree({ isResettle: true });
+  requestAnimationFrame(() => fitToView());
+  updateTierButtons();
+}
+
+function findCanonicalNode(root, targetPath) {
+  if (!root) return null;
+  if (root.path === targetPath) return root;
+  if (!root.children) return null;
+  for (const c of root.children) {
+    const hit = findCanonicalNode(c, targetPath);
+    if (hit) return hit;
+  }
+  return null;
 }
 
 function branchColor(d) {
@@ -1325,11 +1621,13 @@ async function toggleExpandAll() {
   if (isFullyExpanded) {
     state.expandedPaths = new Set();
     setInitialExpanded(TREE, 0, INITIAL_EXPAND_DEPTH);
+    state.maxTierExpanded = INITIAL_EXPAND_DEPTH;
     if (btn) btn.classList.remove("active");
   } else {
     for (const n of state.flatNodes) {
       if (n.type === "directory") state.expandedPaths.add(n.path);
     }
+    state.maxTierExpanded = TREE_MAX_DIR_DEPTH;
     if (btn) btn.classList.add("active");
   }
   // _prevPositions is keyed on path, so we clear it — expanding from 4 to 5000
@@ -1338,6 +1636,68 @@ async function toggleExpandAll() {
   _prevPositions = new Map();
   await updateTree({ isResettle: true });
   requestAnimationFrame(() => fitToView());
+  updateTierButtons();
+}
+
+// ── Tier Controls ─────────────────────────────────────────────────────
+// Plus/minus pair that reveal or hide one whole depth-tier at a time.
+// Build-queue 2026-04-18: a primitive for "show the whole system at this
+// level of detail" — distinct from click-to-expand's per-folder gesture.
+// state.maxTierExpanded = N means every directory at depth < N is expanded.
+
+let TREE_MAX_DIR_DEPTH = 0;
+
+function computeTreeMaxDirDepth() {
+  let max = 0;
+  (function walk(node, depth) {
+    if (!node || node.type !== "directory") return;
+    if (depth > max) max = depth;
+    if (node.children) for (const c of node.children) walk(c, depth + 1);
+  })(TREE, 0);
+  TREE_MAX_DIR_DEPTH = max + 1;  // +1 so plus works while any dir at depth == max still has children to reveal
+}
+
+function expandAllAtTier(tier) {
+  (function walk(node, depth) {
+    if (!node || node.type !== "directory") return;
+    if (depth < tier) state.expandedPaths.add(node.path);
+    if (node.children) for (const c of node.children) walk(c, depth + 1);
+  })(TREE, 0);
+}
+
+function collapseAllAtTier(tier) {
+  (function walk(node, depth) {
+    if (!node || node.type !== "directory") return;
+    if (depth >= tier) state.expandedPaths.delete(node.path);
+    if (node.children) for (const c of node.children) walk(c, depth + 1);
+  })(TREE, 0);
+}
+
+async function revealNextTier() {
+  if (state.maxTierExpanded >= TREE_MAX_DIR_DEPTH) return;
+  state.maxTierExpanded += 1;
+  expandAllAtTier(state.maxTierExpanded);
+  _prevPositions = new Map();
+  await updateTree({ isResettle: true });
+  requestAnimationFrame(() => fitToView());
+  updateTierButtons();
+}
+
+async function hideDeepestTier() {
+  if (state.maxTierExpanded <= 0) return;
+  state.maxTierExpanded -= 1;
+  collapseAllAtTier(state.maxTierExpanded);
+  _prevPositions = new Map();
+  await updateTree({ isResettle: true });
+  requestAnimationFrame(() => fitToView());
+  updateTierButtons();
+}
+
+function updateTierButtons() {
+  const plus = document.getElementById("tier-plus-btn");
+  const minus = document.getElementById("tier-minus-btn");
+  if (plus) plus.disabled = state.maxTierExpanded >= TREE_MAX_DIR_DEPTH;
+  if (minus) minus.disabled = state.maxTierExpanded <= 0;
 }
 
 function expandAncestors(filePath) {
@@ -1438,8 +1798,23 @@ function setupEvents() {
     }
   });
 
+  // Dismiss the node context menu on any left-click / scroll outside it,
+  // or on a subsequent right-click anywhere (nodes re-open it themselves).
+  document.addEventListener("mousedown", (e) => {
+    const menu = document.getElementById("context-menu");
+    if (!menu || !menu.classList.contains("open")) return;
+    if (!menu.contains(e.target)) closeNodeContextMenu();
+  }, true);
+  window.addEventListener("scroll", closeNodeContextMenu, true);
+  window.addEventListener("resize", closeNodeContextMenu);
+
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
+      const menu = document.getElementById("context-menu");
+      if (menu && menu.classList.contains("open")) {
+        closeNodeContextMenu();
+        return;
+      }
       if (document.getElementById("reader").classList.contains("open")) {
         minimizeReader();
       } else {
@@ -1460,6 +1835,12 @@ function setupEvents() {
 
   const expandAllBtn = document.getElementById("expand-all-btn");
   if (expandAllBtn) expandAllBtn.addEventListener("click", toggleExpandAll);
+
+  const tierPlusBtn = document.getElementById("tier-plus-btn");
+  if (tierPlusBtn) tierPlusBtn.addEventListener("click", revealNextTier);
+  const tierMinusBtn = document.getElementById("tier-minus-btn");
+  if (tierMinusBtn) tierMinusBtn.addEventListener("click", hideDeepestTier);
+  updateTierButtons();
 
   setupDivider();
 

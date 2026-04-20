@@ -130,7 +130,7 @@ Running log of ideas Wisdom surfaces during live work that we can't address in t
 
 ---
 
-### 2026-04-18 — Tier-by-tier expand/contract controls (plus/minus by depth)
+### ~~2026-04-18 — Tier-by-tier expand/contract controls (plus/minus by depth)~~ *(shipped 2026-04-19 — header +/- buttons with disable bounds; see [chronicle 19:31](../chronicle/2026-04-19.md))*
 
 **Context:** Mid-iteration on pin-on-expand and dynamic-expanse prototypes. Wisdom surfaced this as a navigation primitive that should exist on BOTH prototypes regardless of which one wins.
 **Idea:** A simple plus/minus pair in the canvas UI that expands or contracts one whole tier at a time, system-wide. Tier 0 = just root. Plus → reveal all tier-1 children (Playful Sincerity, claude-system-public, Wisdom Personal, etc.). Plus again → reveal all tier-2 (PS Software, PS Research, PS Philosophy, all immediate children of every tier-1). Minus → undo one tier. Repeated plus all the way down = full ecosystem reveal procedurally.
@@ -159,7 +159,7 @@ Running log of ideas Wisdom surfaces during live work that we can't address in t
 
 ---
 
-### 2026-04-19 — Bulk-expand: "open all children one tier down"
+### ~~2026-04-19 — Bulk-expand: "open all children one tier down"~~ *(shipped 2026-04-19 — all three triggers: right-click menu, ⌘-click, ⇧-click for collapse; see [chronicle 19:35, 20:10, 21:50](../chronicle/2026-04-19.md))*
 
 **Context:** Physics tuning session (v2-dynamic-alt). Wisdom surfaced mid-test.
 **Idea:** Modifier-click on a parent folder expands the folder AND all its immediate children's folders one tier — a bulk-expand gesture. *"Command click or shift click or I don't know something on a parent it will also open all of the children folders going down one tier."*
@@ -172,6 +172,78 @@ Running log of ideas Wisdom surfaces during live work that we can't address in t
 - Attach `contextmenu` handler in `attachNodeHandlers` (`templates/v2/app.js`).
 - Small floating menu with "Expand children" and "Collapse all" options.
 - Cap recursion depth at 1 tier for this gesture; a separate "expand everything recursively" could live behind a different trigger if ever needed.
+
+---
+
+### ~~2026-04-19 — Slow down expand/collapse animation a touch~~ *(shipped 2026-04-19 — ANIM_DURATION 180→480ms, viewport transition tied to ANIM_DURATION+80; see [chronicle 20:30, 21:00](../chronicle/2026-04-19.md))*
+
+**Context:** Live work in another conversation on the Spatial Workspace canvas. Wisdom dedicating this conversation as the build-queue-capture session so the main build context stays clean.
+**Idea:** The expand/collapse animation is a little fast right now. Ease it down just a bit — not a dramatic change, just enough to see the motion breathe. Doesn't need to be slow or dramatic, just less snappy.
+**Why it matters:** Two reasons Wisdom named: (1) it's nicer to actually *see* the tree move into place instead of it snapping, (2) a slightly slower animation gives the layout/physics more time to render cleanly, which should also reduce any visual pop-in during the transition.
+**Implementation notes from Wisdom:**
+- "It'd be kind of nice to see it all moving."
+- "Doesn't have to be crazy snappy."
+- Slower animation = more render headroom per frame.
+**Rough shape:**
+- Bump the transition duration on expand/collapse in [templates/v2/app.js](../templates/v2/app.js) (or the relevant physics/tween loop) by maybe 1.3–1.8× current. Tune by eye.
+- Keep the easing curve; just stretch the duration.
+
+---
+
+### 2026-04-19 — Perpendicular wedge terminators on connector lines ("plug into the socket")
+
+**Context:** Build-queue capture session. Visual-disambiguation idea for the canvas — how to tell which line belongs to which leaf when lines cross or pass behind buttons.
+**Idea:** Each connector line terminates in a small flat triangle (wedge) oriented **perpendicular to the edge of the leaf button**, with its base flush against the button's edge and slightly "smushed into" it. The wedge acts as a termination glyph — not an arrowhead for direction, but a visual socket-plug that says *"this line ends here, at this button."*
+**Why it matters:** Resolves the ambiguity when a line passes *behind* a leaf it isn't connected to. Lines that terminate at a leaf get the wedge-into-edge cue; lines that merely cross over have no wedge at that leaf, so the viewer instantly knows those lines aren't associated with it. Disambiguates visually busy zones without relying on color coding, z-order tricks, or hover states.
+**Implementation notes from Wisdom (confirmed playback):**
+- Triangle runs **perpendicular to the button's edge** (not pointing at center, not along the line's direction — flat against the edge like a plug face).
+- Wedge is slightly **pushed into / smushed against** the button's edge so the termination reads as attached, not hovering adjacent.
+- Purpose is termination disambiguation, not direction indication — don't conflate with classic arrowheads.
+**Rough shape:**
+- At line render time, for each line's leaf-end, compute the nearest point on the button's edge and the outward normal at that point.
+- Draw a small filled triangle whose base sits on the edge (oriented along the tangent) and whose apex points slightly *into* the button (a few pixels overlap for the "smush" effect). Use the line's color/stroke so it reads as one object.
+- Tune: wedge width ≈ 1.5–2× line stroke width; overlap depth ≈ 2–4px. Should feel like a connector seating into a socket, not a decoration.
+- Depends on stable edge-geometry for leaves (works for circles and rounded rects; worth checking against whatever leaf shape the current canvas uses).
+
+---
+
+### 2026-04-19 — "List view" option in the folder right-click menu
+
+**Context:** Build-queue capture session. Pairs with the earlier 2026-04-19 right-click menu entry ("Bulk-expand: open all children one tier down"). Same right-click menu, another option.
+**Idea:** Add a **"List view"** option to the right-click context menu on folder nodes. When clicked, the side viewer (the panel that currently shows markdown files) displays a **flat list of all files inside that folder, each linked** — click any entry to open that file in the reader. The canvas doesn't have to change at all; this is purely a reader-panel affordance for browsing a folder's contents textually instead of spatially.
+**Why it matters:** Sometimes you want to *read down a folder*, not navigate it on the canvas. Especially for folders with many leaves where clicking each on the canvas is slow, or where you want to scan filenames in a column rather than eyeball a cluster. Complements the canvas instead of replacing it — canvas for spatial navigation, list view for linear browsing.
+**Implementation notes:**
+- Lives in the same right-click menu as "Expand children" (from the Bulk-expand entry above).
+- Label: "List view" (or "Show files" / "List all files" — name TBD).
+- Behavior: populate the reader panel with a generated listing of every file under that folder (probably recursive, but the tier depth should be decided — flat immediate children vs. everything nested).
+- Each listed file is a link that uses the existing reader-open behavior (same as clicking a canvas node).
+- Consider: should the list also show subfolders as nested headers, or flatten everything? Default guess: nested headers with files under each — preserves structure without requiring canvas expansion.
+**Rough shape:**
+- Context menu handler: on "List view" click, traverse the folder's subtree, generate markdown (or equivalent) with `[filename](relative-path)` links organized by subfolder headings.
+- Render into the reader panel as a synthetic "document" (title = folder name + "— list view").
+- Each link click reuses the existing file-open path.
+- Optional: a "Show in canvas" button per entry (pairs with the earlier 2026-04-16 "Go to canvas" entry — same primitive, different entry point).
+
+---
+
+### 2026-04-19 — Progressive zoom-coupled sizing for parent folders (orient-at-zoom-out)
+
+**Context:** Build-queue capture session. Related to the earlier 2026-04-17 "Zoom-dependent cluster labels" entry but distinct — that was about overlay labels on bounding boxes; this is about the parent folder nodes/labels themselves scaling continuously with zoom.
+**Idea:** Parent folder sizes are **inversely coupled to zoom level**. As you zoom out, parent (and especially grandparent and further ancestors) folder nodes/labels **grow progressively larger** to stay legible. As you zoom in, they shrink back down so they don't overwhelm the leaves you're focused on. At max zoom-out — the full ecosystem view — the main top-tier folders should be big and readable enough that you can orient yourself at a glance: "PS is over there, Wisdom Personal is over there, claude-system is over there."
+**Why it matters:** Right now zooming out shrinks everything uniformly, so at full-ecosystem zoom the parent names become as unreadable as the leaves. You lose the macro wayfinding cue exactly when you need it most. Progressive sizing preserves the hierarchy's *role* at every zoom level — at close zoom, leaves are the figure and parents recede; at far zoom, parents become the figure and leaves recede.
+**Key constraint from Wisdom:**
+- "Always be at a legible size, at least the grandfather." → Ancestors ≥ 2 tiers above the currently-focused level should always remain readable. The legibility guarantee is the *minimum*, not the aesthetic target.
+- Progressive, not threshold-based: smooth scaling as zoom changes, not pop-in labels at a specific zoom threshold.
+**Why it's distinct from the 2026-04-17 cluster-labels entry:**
+- That one: overlay labels on cluster bounding boxes, appearing past a zoom threshold, on top of children.
+- This one: the parent folder *nodes themselves* (their buttons/labels) scale inversely with zoom, always present, always in their structural position. They may converge in implementation — a single "adaptive ancestor sizing" system could cover both — worth considering whether these are one feature or two complementary ones.
+**Rough shape:**
+- Compute a per-node display size: `displaySize = baseSize × f(zoomLevel, depthFromLeaf)` where shallower nodes (closer to root) grow faster as zoom decreases.
+- Guarantee a minimum readable size for nodes where `depthFromLeaf ≥ 2` ("at least the grandfather") — clamp at a legibility floor regardless of zoom.
+- Leaf nodes follow the inverse curve — normal-sized at close zoom, fade/shrink out at extreme zoom-out.
+- Handles the "how many leaves are too many to show readably at this zoom" question implicitly: at far zoom-out, leaves shrink and parents grow, so the visual weight auto-shifts to what's actually legible.
+- Tune curve so the transitions feel smooth, not jumpy — probably a log or piecewise curve, not linear.
+- Related: likely pairs with leaf-hiding or leaf-fade-out at extreme zoom-out (complement: leaves aren't just small, they may disappear, leaving clean parent-folder landscape for orientation).
 
 ---
 
