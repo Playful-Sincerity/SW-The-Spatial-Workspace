@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Flextree Layout Test</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #1a1714; color: #ede5d5; font-family: -apple-system, sans-serif; overflow: hidden; }
+  svg { width: 100vw; height: 100vh; }
+  .link { stroke: rgba(237,229,213,0.25); stroke-width: 1; fill: none; }
+  .node rect { rx: 6; ry: 6; cursor: pointer; }
+  .node text { fill: #ede5d5; font-size: 11px; pointer-events: none; }
+  .node.dir rect { stroke: #4ecdc4; stroke-width: 1.5; fill: #252219; }
+  .node.file rect { stroke: rgba(237,229,213,0.2); stroke-width: 1; fill: #1e1b16; }
+  .node.root rect { stroke: #9b7dff; stroke-width: 2; fill: #2a2520; }
+  .node:hover rect { stroke-width: 2; filter: brightness(1.2); }
+  #info { position: fixed; top: 12px; left: 12px; font-size: 12px; opacity: 0.6; }
+</style>
+</head>
+<body>
+<div id="info">Click folders to expand/collapse</div>
+<svg id="canvas"></svg>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+// ── Mock tree data (mirrors the PS ecosystem shape) ──────────────────
+const TREE = {
+  name: "Playful Sincerity Digital Core", type: "dir", children: [
+    { name: "Playful Sincerity", type: "dir", children: [
+      { name: "PS Software", type: "dir", children: [
+        { name: "Spatial Workspace", type: "dir", children: [
+          { name: "CLAUDE.md", type: "file" },
+          { name: "SPEC.md", type: "file" },
+          { name: "generator", type: "dir", children: [
+            { name: "generate-ecosystem.py", type: "file" },
+            { name: "watch-server.py", type: "file" },
+            { name: "screenshot.sh", type: "file" },
+          ]},
+          { name: "templates", type: "dir", children: [
+            { name: "v2", type: "dir", children: [
+              { name: "app.js", type: "file" },
+              { name: "app.css", type: "file" },
+              { name: "template.html", type: "file" },
+            ]},
+          ]},
+          { name: "sessions", type: "dir", children: [
+            { name: "v2", type: "dir", children: [
+              { name: "phase-3b-layout-reset.md", type: "file" },
+            ]},
+          ]},
+          { name: "chronicle", type: "dir", children: [
+            { name: "2026-04-16.md", type: "file" },
+          ]},
+        ]},
+        { name: "RenMap", type: "dir", children: [
+          { name: "CLAUDE.md", type: "file" },
+          { name: "README.md", type: "file" },
+        ]},
+        { name: "The Companion", type: "dir", children: [
+          { name: "CLAUDE.md", type: "file" },
+          { name: "architecture.md", type: "file" },
+          { name: "memory-design.md", type: "file" },
+        ]},
+        { name: "Happy Human Agents", type: "dir", children: [
+          { name: "CLAUDE.md", type: "file" },
+          { name: "pipeline", type: "dir", children: [
+            { name: "inbox", type: "dir", children: Array.from({length: 40}, (_, i) => ({
+              name: `prospect-${String(i+1).padStart(3,'0')}.md`, type: "file"
+            }))},
+            { name: "qualified", type: "dir", children: [
+              { name: "eric-jennings.md", type: "file" },
+              { name: "ryan-rising.md", type: "file" },
+            ]},
+          ]},
+          { name: "agents", type: "dir", children: [
+            { name: "researcher.md", type: "file" },
+            { name: "scorer.md", type: "file" },
+            { name: "outreach-writer.md", type: "file" },
+          ]},
+        ]},
+        { name: "The Hearth", type: "dir", children: [
+          { name: "CLAUDE.md", type: "file" },
+          { name: "skills", type: "dir", children: [
+            { name: "commit.md", type: "file" },
+            { name: "review.md", type: "file" },
+          ]},
+        ]},
+        { name: "PS Bot", type: "dir", children: [
+          { name: "bot.py", type: "file" },
+          { name: "memory.py", type: "file" },
+        ]},
+      ]},
+      { name: "PS Research", type: "dir", children: [
+        { name: "Associative Memory", type: "dir", children: [
+          { name: "CLAUDE.md", type: "file" },
+          { name: "IVNA", type: "dir", children: [
+            { name: "paper-draft.md", type: "file" },
+            { name: "findings", type: "dir", children: [
+              { name: "convergence.md", type: "file" },
+              { name: "graph-dynamics.md", type: "file" },
+              { name: "validation.md", type: "file" },
+            ]},
+          ]},
+          { name: "research", type: "dir", children: [
+            { name: "round-4-synthesis.md", type: "file" },
+            { name: "round-5-agents", type: "dir", children: [
+              { name: "stream-1.md", type: "file" },
+              { name: "stream-2.md", type: "file" },
+              { name: "stream-3.md", type: "file" },
+            ]},
+          ]},
+        ]},
+        { name: "ULP", type: "dir", children: [
+          { name: "CLAUDE.md", type: "file" },
+          { name: "dimensional-ladder.md", type: "file" },
+        ]},
+        { name: "Gravitationalism", type: "dir", children: [
+          { name: "GDGM-spec.md", type: "file" },
+        ]},
+      ]},
+      { name: "PS Events", type: "dir", children: [
+        { name: "PS Dance", type: "dir", children: [
+          { name: "format.md", type: "file" },
+          { name: "playlist.md", type: "file" },
+        ]},
+        { name: "PS Parties", type: "dir", children: [
+          { name: "concept.md", type: "file" },
+        ]},
+        { name: "MultiDance", type: "dir", children: [
+          { name: "format.md", type: "file" },
+        ]},
+      ]},
+      { name: "PS Media", type: "dir", children: [
+        { name: "Good Drivers", type: "dir", children: [
+          { name: "curriculum.md", type: "file" },
+        ]},
+        { name: "PSTS", type: "dir", children: [
+          { name: "outline.md", type: "file" },
+          { name: "chapter-1.md", type: "file" },
+        ]},
+      ]},
+      { name: "PS Philosophy", type: "dir", children: [
+        { name: "PSSO", type: "dir", children: [
+          { name: "pillars.md", type: "file" },
+          { name: "morning-practice.md", type: "file" },
+          { name: "three-layer-model.md", type: "file" },
+        ]},
+      ]},
+    ]},
+    { name: "Claude System", type: "dir", children: [
+      { name: "skills", type: "dir", children: Array.from({length: 20}, (_, i) => ({
+        name: `skill-${i+1}.md`, type: "file"
+      }))},
+      { name: "rules", type: "dir", children: Array.from({length: 15}, (_, i) => ({
+        name: `rule-${i+1}.md`, type: "file"
+      }))},
+      { name: "agents", type: "dir", children: [
+        { name: "researcher.md", type: "file" },
+        { name: "optimizer.md", type: "file" },
+      ]},
+      { name: "memory", type: "dir", children: Array.from({length: 12}, (_, i) => ({
+        name: `memory-${i+1}.md`, type: "file"
+      }))},
+    ]},
+    { name: "Wisdom Personal", type: "dir", children: [
+      { name: "people", type: "dir", children: [
+        { name: "wisdom-happy.md", type: "file" },
+        { name: "chiraya.md", type: "file" },
+        { name: "frank-human.md", type: "file" },
+        { name: "cameron-murdock.md", type: "file" },
+        { name: "rayyan-zahid.md", type: "file" },
+      ]},
+      { name: "Mandarin", type: "dir", children: [
+        { name: "vocab.json", type: "file" },
+        { name: "hsk3-progress.md", type: "file" },
+      ]},
+      { name: "Inventions Portfolio", type: "dir", children: [
+        { name: "index.md", type: "file" },
+      ]},
+    ]},
+  ]
+};
+
+// ── Flextree algorithm (van der Ploeg non-layered tidy tree) ─────────
+// Minimal inline implementation — no external dependency.
+// Places children directly below parent at variable spacing.
+// Guarantees zero crossings for any tree.
+
+function flextreeLayout(root) {
+  const GAP_X = 14;
+  const GAP_Y = 20;
+
+  // Phase 1: bottom-up — compute each subtree's width
+  root.eachAfter(d => {
+    if (!d.children || !d.children.length) {
+      d._subtreeW = d._w;
+      d._subtreeH = d._h;
+    } else {
+      let totalW = 0;
+      let maxH = 0;
+      for (const c of d.children) {
+        if (totalW > 0) totalW += GAP_X;
+        totalW += c._subtreeW;
+        maxH = Math.max(maxH, c._subtreeH);
+      }
+      d._subtreeW = Math.max(d._w, totalW);
+      d._subtreeH = d._h + GAP_Y + maxH;
+    }
+  });
+
+  // Phase 2: top-down — assign positions
+  root.x = 0;
+  root.y = 0;
+  root.each(d => {
+    if (!d.children || !d.children.length) return;
+    let cursor = d.x - d._subtreeW / 2 + d._w / 2;
+    // If parent is wider than children total, center children under parent
+    const childrenTotalW = d.children.reduce((s, c, i) => s + c._subtreeW + (i > 0 ? GAP_X : 0), 0);
+    if (childrenTotalW < d._subtreeW) {
+      cursor = d.x - childrenTotalW / 2;
+    } else {
+      cursor = d.x - d._subtreeW / 2;
+    }
+    for (const c of d.children) {
+      c.x = cursor + c._subtreeW / 2;
+      c.y = d.y + d._h + GAP_Y;
+      cursor += c._subtreeW + GAP_X;
+    }
+  });
+}
+
+// ── Measurement ──────────────────────────────────────────────────────
+const _mc = document.createElement("canvas").getContext("2d");
+
+function measure(d) {
+  const isRoot = d.depth === 0;
+  const isDir = d.data.type === "dir";
+  const fontSize = isRoot ? 14 : (isDir ? 12 : 11);
+  const padX = isRoot ? 18 : (isDir ? 14 : 12);
+  const minW = isRoot ? 200 : (isDir ? 100 : 80);
+  const h = isRoot ? 40 : (isDir ? 30 : 26);
+
+  _mc.font = `${isRoot ? 700 : isDir ? 600 : 500} ${fontSize}px -apple-system, sans-serif`;
+  const label = d.data.name + (isDir && d.data.children && !expanded.has(d.data) ? ` (${d.data.children.length})` : "");
+  const textW = _mc.measureText(label).width;
+  d._w = Math.min(260, Math.max(minW, Math.ceil(textW + padX * 2)));
+  d._h = h;
+  d._label = label;
+}
+
+// ── State ────────────────────────────────────────────────────────────
+const expanded = new Set();
+expanded.add(TREE); // root starts expanded
+
+function getVisibleTree(node) {
+  const clone = { name: node.name, type: node.type, _src: node, children: undefined };
+  if (node.type === "dir" && expanded.has(node) && node.children) {
+    clone.children = node.children.map(c => getVisibleTree(c));
+  }
+  return clone;
+}
+
+// ── Render ───────────────────────────────────────────────────────────
+const svg = d3.select("#canvas");
+const width = window.innerWidth, height = window.innerHeight;
+svg.attr("viewBox", `0 0 ${width} ${height}`);
+
+const zoomG = svg.append("g");
+const contentG = zoomG.append("g");
+
+const zoom = d3.zoom().scaleExtent([0.05, 4]).on("zoom", e => {
+  zoomG.attr("transform", e.transform);
+});
+svg.call(zoom);
+
+function render() {
+  const vis = getVisibleTree(TREE);
+  const root = d3.hierarchy(vis);
+  root.each(d => measure(d));
+  flextreeLayout(root);
+
+  const descendants = root.descendants();
+  const links = root.links();
+
+  // Center content
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const d of descendants) {
+    minX = Math.min(minX, d.x - d._w/2);
+    maxX = Math.max(maxX, d.x + d._w/2);
+    minY = Math.min(minY, d.y);
+    maxY = Math.max(maxY, d.y + d._h);
+  }
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  contentG.attr("transform", `translate(${width/2 - cx}, ${60 - minY})`);
+
+  // Links
+  const linkSel = contentG.selectAll(".link").data(links, d => d.target.data.name + d.target.depth);
+  linkSel.exit().remove();
+  const linkEnter = linkSel.enter().append("path").attr("class", "link");
+  linkEnter.merge(linkSel).transition().duration(300)
+    .attr("d", d => {
+      const sx = d.source.x, sy = d.source.y + d.source._h;
+      const tx = d.target.x, ty = d.target.y;
+      const my = (sy + ty) / 2;
+      return `M${sx},${sy} C${sx},${my} ${tx},${my} ${tx},${ty}`;
+    });
+
+  // Nodes
+  const nodeSel = contentG.selectAll(".node").data(descendants, d => d.data.name + d.depth);
+  nodeSel.exit().remove();
+  const nodeEnter = nodeSel.enter().append("g")
+    .attr("class", d => "node " + (d.depth === 0 ? "root" : d.data.type === "dir" ? "dir" : "file"));
+  nodeEnter.append("rect");
+  nodeEnter.append("text").attr("text-anchor", "middle").attr("dominant-baseline", "central");
+
+  const nodeUpdate = nodeEnter.merge(nodeSel);
+  nodeUpdate.transition().duration(300)
+    .attr("transform", d => `translate(${d.x},${d.y})`);
+
+  nodeUpdate.select("rect")
+    .attr("x", d => -d._w / 2)
+    .attr("width", d => d._w)
+    .attr("height", d => d._h);
+
+  nodeUpdate.select("text")
+    .attr("y", d => d._h / 2)
+    .text(d => d._label)
+    .style("font-size", d => d.depth === 0 ? "14px" : d.data.type === "dir" ? "12px" : "11px");
+
+  // Click handler
+  nodeUpdate.on("click", (e, d) => {
+    if (d.data.type !== "dir" || !d.data._src.children) return;
+    if (expanded.has(d.data._src)) {
+      expanded.delete(d.data._src);
+    } else {
+      expanded.add(d.data._src);
+    }
+    render();
+  });
+
+  // Info
+  const nodeCount = descendants.length;
+  document.getElementById("info").textContent =
+    `${nodeCount} nodes · Click folders to expand/collapse · Zero edge crossings guaranteed`;
+
+  // Fit to view on first render
+  if (descendants.length <= 5) {
+    const scale = Math.min(1, width / (maxX - minX + 100), height / (maxY - minY + 100));
+    svg.call(zoom.transform, d3.zoomIdentity.translate(width/2, height/2).scale(scale).translate(-cx, -cy));
+  }
+}
+
+render();
+</script>
+</body>
+</html>

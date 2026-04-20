@@ -1,0 +1,31 @@
+{
+  "_comment_label": "Root node label — appears in the page header and at the center of the canvas.",
+  "label": "My Vault",
+
+  "_comment_roots": "Each root becomes a top-level branch of the canvas. 'name' is the display label, 'path' is a directory on disk. Supports ~ for your home directory. Add as many as you like.",
+  "roots": [
+    { "name": "Notes",    "path": "~/Documents/notes" },
+    { "name": "Projects", "path": "~/projects" }
+  ],
+
+  "_comment_branchColors": "Optional. Tints the connector lines radiating from each branch. Hex colors. Keys must match the 'name' fields above. Missing keys fall back to a neutral warm tone.",
+  "branchColors": {
+    "Notes":    "#764AE2",
+    "Projects": "#5A9E6F"
+  },
+
+  "_comment_statusColors": "Optional. Colors used for the 'ambient status' border/tint on project nodes whose metadata declares a phase. Any keys you omit fall back to the built-in palette.",
+  "statusColors": {
+    "active":   "#1A9E5A",
+    "building": "#D97706",
+    "design":   "#4B7FCC",
+    "concept":  "#9E9E9E",
+    "paused":   "#B45309"
+  },
+
+  "_comment_statusYaml": "Optional. Path to a YAML file listing projects with phase/momentum metadata (format: a flat list of dicts with 'path' and 'phase' keys). Set to null to skip.",
+  "statusYaml": null,
+
+  "_comment_exclude": "Directory names (not paths) to skip anywhere in the tree. Dotfiles are already skipped.",
+  "exclude": [".git", "node_modules", "__pycache__", "dist", "build", ".venv", "venv", ".next", ".vercel"]
+}

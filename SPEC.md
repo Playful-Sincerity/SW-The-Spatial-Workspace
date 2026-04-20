@@ -188,25 +188,31 @@ Completed 2026-03-24.
 **Verification**: Run the generator, open the SVG, confirm all agents appear with correct connections and status colors.
 Edit one agent's frontmatter, re-run, confirm the output reflects the change.
 
-### Phase 2: Interactive HTML Canvas (NEXT)
+### Phase 2: Interactive Ecosystem Canvas (IN PROGRESS)
 
-Single HTML file with inline CSS/JS. No dependencies. Opens in any browser.
+Single HTML file with inline CSS/JS + D3 + marked. No build step. Opens in any browser, also serves over the live watch-server.
 
-**Core features**:
-- **Clickable agents** — click a node to see its prompt summary, last run date, recent outputs, and a link to its prompt file.
-- **Hoverable connections** — hover an arrow to see what data flows along it, when it last flowed, and which files are involved.
-- **Status colors** — green glow for recently run, amber for getting stale, red for never run or broken connections. Computed from `last_run` dates in frontmatter.
-- **Zoom levels** — zoomed out = system overview (current SVG view). Zoomed in = agent detail with output previews and connection details.
-- **Drag-and-drop** — rearrange agents spatially to explore different organizational models. Positions persist in localStorage.
-- **Search/filter** — filter by tier, status, connection type. Highlight specific data flow paths.
+**Built (2026-04-03 / extended 2026-04-16)**:
+- **Generator** (`generator/generate-ecosystem.py`) — scans `~/Playful Sincerity`, `~/claude-system`, `~/Wisdom Personal`. Embeds all `.md` content (≤500KB each) as JSON. Attaches phase/momentum from `~/claude-system/docs/project-status.yaml`. Output: `~/ecosystem-canvas.html`.
+- **Markmap layout** — horizontal D3 tree with progressive disclosure. Click directories to expand/collapse, click files to read inline.
+- **Radial layout** (added 2026-04-16) — `d3.cluster()` polar tree. All leaves on the same ring; depth encoded by ring number. Links coloured by top-level branch (PS purple, Claude System green, Wisdom Personal orange). Labels rotate to read outward.
+- **Layout toggle** — header button switches between markmap / radial. Sticky via `localStorage`. Press `r` for keyboard swap.
+- **File reader** — click any `.md` node to render its content via marked.js in a resizable side panel.
+- **Search** — auto-expands ancestor paths to matches; dims non-matching nodes; highlights matches.
+- **Status colours** — project directories with `phase` field get a coloured dot (active green, building amber, design blue, paused red, etc.).
+- **Watch-server** (`generator/watch-server.py`, added 2026-04-16) — stdlib HTTP server. Polls filesystem signature every N seconds, regenerates on change, serves at `http://localhost:8765`. Exposes `/__snapshot.json` so the open canvas auto-reloads when the snapshot hash changes. Header indicator pulses green when live.
 
 **Technical approach**:
-- Generator script produces a single `.html` file with all data, styles, and behavior inline.
-- Agent metadata is embedded as a JSON object in a `<script>` tag.
-- Canvas rendering via SVG (same visual language as Phase 1) with event handlers for interactivity.
-- No external dependencies — no D3, no React, no CDN links.
+- D3 v7 + marked.js v15 inlined into the template. No CDN, no npm.
+- `app.html` is a template with three placeholders the generator fills in: D3 lib, marked lib, `ECOSYSTEM_DATA` JSON.
+- Watch-server is stdlib only. Signature is sha256 of `path|mtime|size` for every tracked `.md` file.
+- Safe `</script>` escaping in the JSON injection so embedded markdown can't break the parser.
 
-**Output**: `outputs/demo/workspace.html` (or `spatial-workspace/output/workspace.html` if the project is extracted by then).
+**Output**: `~/ecosystem-canvas.html` (~36MB at 5204 nodes, 3976 markdown files with content as of 2026-04-16).
+
+**Open**:
+- Static (snapshot): `open ~/ecosystem-canvas.html`
+- Live (auto-reload): `python3 generator/watch-server.py`
 
 ### Phase 3: Spatial Workspace (LONG-TERM)
 

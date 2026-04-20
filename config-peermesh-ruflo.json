@@ -1,0 +1,20 @@
+{
+  "label": "PeerMesh + Ruflo",
+  "roots": [
+    { "name": "PeerMesh", "path": "~/Playful Sincerity/PS Software/PeerMesh" },
+    { "name": "Ruflo",    "path": "~/claude-system/play/ruflo-study" }
+  ],
+  "branchColors": {
+    "PeerMesh": "#4B7FCC",
+    "Ruflo":    "#D97706"
+  },
+  "statusColors": {
+    "active":   "#1A9E5A",
+    "building": "#D97706",
+    "design":   "#4B7FCC",
+    "concept":  "#9E9E9E",
+    "paused":   "#B45309"
+  },
+  "statusYaml": "~/claude-system/docs/project-status.yaml",
+  "exclude": [".git", "node_modules", "__pycache__", ".lake", ".venv", "venv", ".next", ".vercel", "dist", "build", ".cache", ".Trash", "Trash", ".DS_Store", ".claude", ".github"]
+}

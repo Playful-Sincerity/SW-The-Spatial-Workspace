@@ -13,8 +13,22 @@ Both perspectives are needed.
 ## Project Status
 
 - **Phase 1** (Living SVG): DONE — frontmatter + generator + SVG + registry
-- **Phase 2** (Interactive HTML Canvas): NEXT
+- **Phase 2** (Interactive HTML Canvas): IN PROGRESS — ecosystem canvas live with markmap + radial layouts and watch-server auto-reload (2026-04-16)
 - **Phase 3** (Spatial Workspace): LONG-TERM
+
+## Quick Start
+
+```bash
+# Static snapshot (regenerate + open)
+python3 generator/generate-ecosystem.py
+open ~/ecosystem-canvas.html
+
+# Live mode — serves canvas, auto-regenerates on filesystem changes
+python3 generator/watch-server.py
+# → http://localhost:8765 (browser opens automatically)
+```
+
+In the canvas: toggle Markmap/Radial in the header (or press `r`). Search with `⌘F`. Click any `.md` file to read it. Esc closes the reader.
 
 ## Key Files
 
@@ -45,10 +59,18 @@ cd ~/Playful\ Sincerity/PS\ Media/playful-sincerity-agents
 python3 outreach-agents/scripts/generate-architecture.py
 ```
 
+## Subprojects
+
+### CoVibe (`covibe/`)
+Multiplayer Claude Code — a collaborative web interface for shared AI sessions. Multiple people see the same conversation, file tree, and can prompt/steer together. Built on the Agent SDK. Eventually integrates into Spatial Workspace as the collaborative editing layer beneath the 2D spatial canvas.
+
+See `covibe/CLAUDE.md` for full project details.
+
 ## Cross-References
 
 - **PS Outreach Agents** (`~/Playful Sincerity/PS Media/playful-sincerity-agents/`): First consumer of the spatial workspace pattern.
 - **RenMap** (`~/Playful Sincerity/PS Software/RenMap/`): Shares the spatial-interface philosophy. Both are about replacing linear/algorithmic interfaces with browsable 2D canvases.
+- **Shared Core** (`~/Playful Sincerity/PS Software/Shared Core/`): Shared rules/skills/knowledge that CoVibe sessions load. Research on sync primitives, collaboration architectures, and product landscape lives there.
 - **SPEC.md**: Contains full lessons learned from previous visualization approaches (ASCII, Miro, hand-crafted SVG, generated SVG).
 
 ## Gotchas

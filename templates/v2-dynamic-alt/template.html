@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spatial Workspace</title>
+<style>
+/* __APP_CSS__ */
+</style>
+</head>
+<body>
+
+<div class="sw-header">
+  <h1 id="sw-title">Spatial Workspace</h1>
+  <span class="subtitle" id="sw-subtitle">Spatial Workspace</span>
+  <div class="sw-search-box">
+    <svg class="sw-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="11" cy="11" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <line x1="16" y1="16" x2="20" y2="20" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+    <input type="text" id="search-input" placeholder="Search the canvas" />
+    <kbd class="sw-kbd">⌘F</kbd>
+  </div>
+  <button class="sw-header-btn" id="expand-all-btn" title="Show the whole ecosystem (⌘E)" aria-label="Show the whole ecosystem">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="1.8" fill="currentColor"/>
+      <circle cx="4.5" cy="12" r="1.4" fill="currentColor"/>
+      <circle cx="19.5" cy="12" r="1.4" fill="currentColor"/>
+      <circle cx="12" cy="4.5" r="1.4" fill="currentColor"/>
+      <circle cx="12" cy="19.5" r="1.4" fill="currentColor"/>
+      <circle cx="6.8" cy="6.8" r="1.1" fill="currentColor"/>
+      <circle cx="17.2" cy="6.8" r="1.1" fill="currentColor"/>
+      <circle cx="6.8" cy="17.2" r="1.1" fill="currentColor"/>
+      <circle cx="17.2" cy="17.2" r="1.1" fill="currentColor"/>
+    </svg>
+  </button>
+  <button class="sw-header-btn" id="settings-btn" title="Display settings" aria-label="Display settings">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="6" cy="12" r="1.6" fill="currentColor"/>
+      <circle cx="12" cy="12" r="1.6" fill="currentColor"/>
+      <circle cx="18" cy="12" r="1.6" fill="currentColor"/>
+    </svg>
+  </button>
+  <span class="sw-stats" id="stats">
+    <span class="sw-live-dot" id="live-dot" title="Live updates not connected"></span>
+    <span id="stats-text"></span>
+  </span>
+</div>
+
+<div class="sw-settings-panel" id="settings-panel">
+  <h3>Display</h3>
+  <div class="sw-settings-row">
+    <label>Ring spacing <span class="value" id="set-ringSpacing-val"></span></label>
+    <input type="range" id="set-ringSpacing" min="60" max="800" step="10" />
+  </div>
+  <div class="sw-settings-row">
+    <label>Leaf spacing <span class="value" id="set-leafArc-val"></span></label>
+    <input type="range" id="set-leafArc" min="4" max="120" step="2" />
+  </div>
+  <div class="sw-settings-row">
+    <label>Click target <span class="value" id="set-hitRadius-val"></span></label>
+    <input type="range" id="set-hitRadius" min="4" max="50" step="1" />
+  </div>
+  <div class="sw-settings-row">
+    <label>Label scale <span class="value" id="set-labelScale-val"></span></label>
+    <input type="range" id="set-labelScale" min="0.7" max="1.6" step="0.05" />
+  </div>
+  <button class="sw-settings-reset" id="set-reset">Reset to defaults</button>
+</div>
+
+<div class="sw-main">
+  <div class="sw-canvas" id="canvas"></div>
+  <div class="sw-divider" id="divider"></div>
+  <div class="sw-reader" id="reader">
+    <div class="sw-tabs" id="tab-strip"></div>
+    <div class="sw-reader-header">
+      <button class="sw-reader-close" id="reader-close" title="Minimize (click outside also works · Esc)" aria-label="Minimize reader">
+        <svg viewBox="0 0 12 16" aria-hidden="true">
+          <path d="M 2 3 L 9 8 L 2 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <div style="flex:1; min-width:0;">
+        <div class="filename" id="reader-filename">No file selected</div>
+        <div class="filepath" id="reader-filepath"></div>
+      </div>
+      <button class="sw-copy-path" id="copy-path" title="Copy file path" aria-label="Copy path">
+        <svg viewBox="0 0 18 18" aria-hidden="true">
+          <rect x="3" y="2" width="10" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <rect x="6" y="5" width="10" height="12" rx="2" fill="var(--sw-surface)" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+      </button>
+    </div>
+    <div class="sw-reader-content" id="reader-content">
+      <div class="sw-reader-empty">Click a .md file to view its contents</div>
+    </div>
+  </div>
+</div>
+
+<div class="sw-open-files" id="open-files" role="region" aria-label="Open files">
+  <div class="sw-open-files-header">OPEN FILES</div>
+  <div class="sw-open-files-list" id="open-files-list"></div>
+</div>
+
+<div class="sw-legend" id="legend" aria-label="Status legend">
+  <span class="sw-legend-title">STATUS</span>
+  <span class="sw-legend-chip"><span class="sw-legend-dot" style="background: var(--sw-heat-hot);"></span>Active</span>
+  <span class="sw-legend-chip"><span class="sw-legend-dot" style="background: var(--sw-heat-warm);"></span>Designing</span>
+  <span class="sw-legend-chip"><span class="sw-legend-dot" style="background: var(--sw-heat-cool);"></span>Concept</span>
+  <span class="sw-legend-chip"><span class="sw-legend-dot" style="background: var(--sw-heat-cold);"></span>Paused</span>
+  <span class="sw-legend-chip"><span class="sw-legend-dot" style="background: transparent; border: 1px solid rgba(237,229,213,0.25);"></span>No status</span>
+</div>
+
+<div class="sw-tooltip" id="tooltip"></div>
+
+<!-- Libraries (inlined by generator) -->
+<script>/* __D3_LIB__ */</script>
+<script>/* __MARKED_LIB__ */</script>
+
+<!-- Config + Ecosystem Data (injected by generator) -->
+<script>/* __CONFIG__ */</script>
+<script>/* __ECOSYSTEM_DATA__ */</script>
+
+<script>
+/* __APP_JS__ */
+</script>
+</body>
+</html>

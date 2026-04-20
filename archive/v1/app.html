@@ -1,0 +1,1800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Playful Sincerity Digital Core — Spatial Workspace</title>
+<style>
+/* ── Reset & Base ────────────────────────────────────────── */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --cream: #F9F0E0;
+  --purple: #764AE2;
+  --purple-light: #9B7AE8;
+  --purple-faint: rgba(118, 74, 226, 0.08);
+  --text: #2a2a2a;
+  --text-muted: #888;
+  --border: rgba(118, 74, 226, 0.15);
+  --node-file: #5A9E6F;
+  --node-dir: #764AE2;
+  --node-dir-empty: #aaa;
+  --status-active: #4CAF50;
+  --status-building: #FF9800;
+  --status-concept: #9E9E9E;
+  --status-design: #2196F3;
+  --status-paused: #F44336;
+  --status-maintenance: #607D8B;
+}
+
+body {
+  background: var(--cream);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  overflow: hidden;
+  height: 100vh;
+}
+
+/* ── Header ──────────────────────────────────────────────── */
+.sw-header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 44px;
+  padding: 0 16px;
+  background: rgba(249, 240, 224, 0.95);
+  backdrop-filter: blur(8px);
+  border-bottom: 2px solid var(--border);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sw-header h1 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--purple);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sw-header .subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.sw-search-box {
+  margin-left: auto;
+  position: relative;
+}
+
+.sw-search-box input {
+  width: 220px;
+  padding: 5px 10px 5px 28px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: white;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.sw-search-box input:focus {
+  border-color: var(--purple);
+}
+
+.sw-search-box::before {
+  content: "\2315";
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.sw-stats {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ── Settings Panel ──────────────────────────────────────── */
+.sw-settings-btn {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.12s;
+  line-height: 1;
+}
+
+.sw-settings-btn:hover {
+  color: var(--purple);
+  border-color: var(--purple);
+}
+
+.sw-settings-panel {
+  position: fixed;
+  top: 52px;
+  right: 16px;
+  width: 280px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  z-index: 110;
+  display: none;
+  font-size: 13px;
+}
+
+.sw-settings-panel.open {
+  display: block;
+}
+
+.sw-settings-panel h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.sw-settings-row {
+  margin-bottom: 12px;
+}
+
+.sw-settings-row label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.sw-settings-row label span.value {
+  color: var(--purple);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.sw-settings-row input[type="range"] {
+  width: 100%;
+  accent-color: var(--purple);
+}
+
+.sw-settings-row input[type="checkbox"] {
+  margin-right: 6px;
+  accent-color: var(--purple);
+}
+
+.sw-settings-reset {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+  margin-top: 4px;
+}
+
+.sw-settings-reset:hover {
+  color: var(--purple);
+}
+
+/* ── Live Indicator ──────────────────────────────────────── */
+.sw-live-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #BDBDBD;
+  margin-right: 6px;
+  vertical-align: middle;
+  transition: background 0.3s, box-shadow 0.3s;
+}
+
+.sw-live-dot.live {
+  background: var(--status-active);
+  box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+  animation: pulse 2s infinite;
+}
+
+.sw-live-dot.refreshing {
+  background: var(--status-building);
+}
+
+@keyframes pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.5); }
+  70%  { box-shadow: 0 0 0 8px rgba(76, 175, 80, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
+}
+
+/* ── Main Layout ─────────────────────────────────────────── */
+.sw-main {
+  display: flex;
+  height: calc(100vh - 44px);
+  margin-top: 44px;
+}
+
+.sw-canvas {
+  flex: 1;
+  min-width: 300px;
+  position: relative;
+  overflow: hidden;
+}
+
+.sw-canvas svg {
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+
+.sw-canvas svg:active {
+  cursor: grabbing;
+}
+
+/* ── Divider ─────────────────────────────────────────────── */
+.sw-divider {
+  width: 5px;
+  background: var(--border);
+  cursor: col-resize;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.sw-divider:hover, .sw-divider.active {
+  background: var(--purple-light);
+}
+
+/* ── Reader Panel ────────────────────────────────────────── */
+.sw-reader {
+  width: 0;
+  min-width: 0;
+  background: white;
+  overflow: hidden;
+  transition: width 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.sw-reader.open {
+  width: 45%;
+  min-width: 320px;
+}
+
+.sw-reader-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Tab strip — sits above the reader header, browser/VS Code style */
+.sw-tabs {
+  display: flex;
+  background: #f5efe2;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  flex-shrink: 0;
+  scrollbar-width: thin;
+}
+
+.sw-tabs::-webkit-scrollbar { height: 4px; }
+.sw-tabs::-webkit-scrollbar-thumb { background: var(--border); }
+
+.sw-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border);
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 200px;
+  transition: background 0.1s;
+  font-family: inherit;
+}
+
+.sw-tab:hover {
+  background: rgba(118, 74, 226, 0.06);
+  color: var(--text);
+}
+
+.sw-tab.active {
+  background: white;
+  color: var(--purple);
+  font-weight: 600;
+  border-bottom: 2px solid var(--purple);
+  padding-bottom: 4px;
+}
+
+.sw-tab .tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+.sw-tab .tab-x {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  opacity: 0.5;
+  line-height: 1;
+}
+
+.sw-tab .tab-x:hover {
+  background: rgba(0,0,0,0.1);
+  opacity: 1;
+}
+
+.sw-reader-header .filename {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--purple);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sw-reader-header .filepath {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.sw-reader-close {
+  background: var(--purple-faint);
+  border: 1px solid var(--border);
+  color: var(--purple);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.12s;
+  line-height: 1;
+}
+
+.sw-reader-close:hover {
+  background: var(--purple);
+  color: white;
+  border-color: var(--purple);
+}
+
+.sw-reader-close:active {
+  transform: translateX(2px);
+}
+
+.sw-copy-path {
+  background: white;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.12s;
+  line-height: 1;
+  padding: 0;
+}
+
+.sw-copy-path:hover {
+  border-color: var(--purple);
+  color: var(--purple);
+}
+
+.sw-copy-path.copied {
+  background: var(--status-active);
+  border-color: var(--status-active);
+  color: white;
+}
+
+.sw-reader-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+/* ── Markdown Styles ─────────────────────────────────────── */
+.sw-reader-content h1 { font-size: 22px; margin: 24px 0 12px; color: var(--purple); border-bottom: 2px solid var(--purple-faint); padding-bottom: 6px; }
+.sw-reader-content h2 { font-size: 18px; margin: 20px 0 10px; color: #333; }
+.sw-reader-content h3 { font-size: 15px; margin: 16px 0 8px; color: #444; }
+.sw-reader-content h4 { font-size: 14px; margin: 14px 0 6px; color: #555; }
+.sw-reader-content p { margin: 8px 0; }
+.sw-reader-content ul, .sw-reader-content ol { margin: 8px 0; padding-left: 24px; }
+.sw-reader-content li { margin: 3px 0; }
+.sw-reader-content code { background: #f5f0e8; padding: 1px 5px; border-radius: 3px; font-size: 13px; font-family: 'SF Mono', 'Fira Code', monospace; }
+.sw-reader-content pre { background: #2a2a2a; color: #e0e0e0; padding: 14px; border-radius: 6px; overflow-x: auto; margin: 12px 0; }
+.sw-reader-content pre code { background: none; color: inherit; padding: 0; }
+.sw-reader-content blockquote { border-left: 3px solid var(--purple-light); padding: 8px 14px; margin: 10px 0; background: var(--purple-faint); border-radius: 0 4px 4px 0; }
+.sw-reader-content table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 13px; }
+.sw-reader-content th, .sw-reader-content td { border: 1px solid #ddd; padding: 6px 10px; text-align: left; }
+.sw-reader-content th { background: var(--purple-faint); font-weight: 600; }
+.sw-reader-content a { color: var(--purple); }
+.sw-reader-content hr { border: none; border-top: 1px solid #eee; margin: 16px 0; }
+.sw-reader-content img { max-width: 100%; }
+
+.sw-reader-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-style: italic;
+}
+
+/* ── Tree Nodes (Markmap-style) ───────────────────────────── */
+.node {
+  cursor: pointer;
+}
+
+.node text {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  fill: var(--text);
+  cursor: pointer;
+}
+
+.node text.radial-root {
+  font-weight: 700;
+  fill: var(--purple);
+}
+
+/* Expanded directories — hide labels entirely so the leaves dominate.
+   The node dot stays visible; hover for the name. */
+.node text.expanded-dir {
+  display: none;
+}
+
+/* Leader line connecting a dodged label back to its node */
+.node line.label-leader {
+  pointer-events: none;
+}
+
+/* Minimized-reader pill — click to restore the file viewer with all tabs */
+.sw-pill {
+  position: fixed;
+  top: 56px;
+  right: 16px;
+  background: var(--purple);
+  color: white;
+  padding: 6px 12px 6px 14px;
+  border-radius: 18px;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(118, 74, 226, 0.25);
+  display: none;
+  align-items: center;
+  gap: 8px;
+  z-index: 95;
+}
+
+.sw-pill.visible {
+  display: inline-flex;
+}
+
+.sw-pill:hover {
+  background: var(--purple-light);
+}
+
+.sw-pill .pill-icon {
+  font-size: 11px;
+  opacity: 0.9;
+}
+
+.sw-pill .pill-x {
+  background: rgba(255,255,255,0.25);
+  border: none;
+  color: white;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+}
+
+.sw-pill .pill-x:hover {
+  background: rgba(255,255,255,0.4);
+}
+
+.node text.dimmed {
+  opacity: 0.12;
+}
+
+.node text.highlighted {
+  font-weight: 700;
+}
+
+.node circle {
+  cursor: pointer;
+  stroke: none;
+}
+
+.link {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.link.dimmed {
+  opacity: 0.06;
+}
+
+/* ── Tooltip ─────────────────────────────────────────────── */
+.sw-tooltip {
+  position: fixed;
+  padding: 6px 10px;
+  background: rgba(42, 42, 42, 0.92);
+  color: white;
+  border-radius: 4px;
+  font-size: 11px;
+  pointer-events: none;
+  z-index: 200;
+  max-width: 350px;
+  line-height: 1.4;
+  display: none;
+}
+</style>
+</head>
+<body>
+
+<div class="sw-header">
+  <h1>Digital Core</h1>
+  <span class="subtitle">Playful Sincerity — Spatial Workspace</span>
+  <div class="sw-search-box">
+    <input type="text" id="search-input" placeholder="Search files..." />
+  </div>
+  <button class="sw-settings-btn" id="settings-btn" title="Display settings">⚙</button>
+  <span class="sw-stats" id="stats">
+    <span class="sw-live-dot" id="live-dot" title="Live updates not connected"></span>
+    <span id="stats-text"></span>
+  </span>
+</div>
+
+<div class="sw-settings-panel" id="settings-panel">
+  <h3>Display</h3>
+  <div class="sw-settings-row">
+    <label>Label font size <span class="value" id="set-fontSize-val"></span></label>
+    <input type="range" id="set-fontSize" min="6" max="32" step="1" />
+  </div>
+  <div class="sw-settings-row">
+    <label>Ring spacing <span class="value" id="set-ringSpacing-val"></span></label>
+    <input type="range" id="set-ringSpacing" min="60" max="800" step="10" />
+  </div>
+  <div class="sw-settings-row">
+    <label>Leaf spacing <span class="value" id="set-leafArc-val"></span></label>
+    <input type="range" id="set-leafArc" min="4" max="120" step="2" />
+  </div>
+  <div class="sw-settings-row">
+    <label>Click target <span class="value" id="set-hitRadius-val"></span></label>
+    <input type="range" id="set-hitRadius" min="4" max="50" step="1" />
+  </div>
+  <div class="sw-settings-row">
+    <label><input type="checkbox" id="set-labelDodge" /> Push overlapping labels apart</label>
+  </div>
+  <div class="sw-settings-row">
+    <label>Label spacing (when dodge on) <span class="value" id="set-dodgeStrength-val"></span></label>
+    <input type="range" id="set-dodgeStrength" min="0" max="5" step="0.1" />
+  </div>
+  <button class="sw-settings-reset" id="set-reset">Reset to defaults</button>
+</div>
+
+<div class="sw-main">
+  <div class="sw-canvas" id="canvas"></div>
+  <div class="sw-divider" id="divider"></div>
+  <div class="sw-reader" id="reader">
+    <div class="sw-tabs" id="tab-strip"></div>
+    <div class="sw-reader-header">
+      <button class="sw-reader-close" id="reader-close" title="Minimize (click outside also works · Esc)">→</button>
+      <div style="flex:1; min-width:0;">
+        <div class="filename" id="reader-filename">No file selected</div>
+        <div class="filepath" id="reader-filepath"></div>
+      </div>
+      <button class="sw-copy-path" id="copy-path" title="Copy file path">📋</button>
+    </div>
+    <div class="sw-reader-content" id="reader-content">
+      <div class="sw-reader-empty">Click a .md file to view its contents</div>
+    </div>
+  </div>
+</div>
+
+<div class="sw-pill" id="minimized-pill" title="Click to restore reader · × to close all tabs">
+  <span class="pill-icon">📄</span>
+  <span id="pill-name"></span>
+  <button class="pill-x" id="pill-close" title="Close all tabs">×</button>
+</div>
+
+<div class="sw-tooltip" id="tooltip"></div>
+
+<!-- Libraries (inlined by generator) -->
+<script>/* __D3_LIBRARY__ */</script>
+<script>/* __MARKED_LIBRARY__ */</script>
+
+<!-- Ecosystem Data (injected by generator) -->
+<script>/* __ECOSYSTEM_DATA__ */</script>
+
+<script>
+// ── Settings ──────────────────────────────────────────────
+const SETTINGS_DEFAULTS = {
+  fontSize: 14,         // px — label font size
+  ringSpacing: 180,     // px between depth rings
+  leafArc: 22,          // px of arc length per leaf at the perimeter
+  hitRadius: 16,        // px — invisible click area around each node
+  labelDodge: true,     // stack overlapping labels apart
+  dodgeStrength: 2.5,   // gap padding between adjacent stacked labels (0 = touch, 5 = generous)
+};
+
+function loadSettings() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("sw-settings") || "{}");
+    return { ...SETTINGS_DEFAULTS, ...saved };
+  } catch (e) {
+    return { ...SETTINGS_DEFAULTS };
+  }
+}
+
+function saveSettings() {
+  localStorage.setItem("sw-settings", JSON.stringify(state.settings));
+}
+
+// ── App State ──────────────────────────────────────────────
+const state = {
+  expandedPaths: new Set(),
+  selectedPath: null,
+  searchQuery: "",
+  flatNodes: [],
+  settings: loadSettings(),
+  // Tab system: every opened file lives in openTabs until you close its tab.
+  // activeTabIndex points to the currently-displayed tab. Reader is shown
+  // when there's at least one tab AND the user hasn't minimized it.
+  openTabs: [],
+  activeTabIndex: -1,
+  readerMinimized: false,
+};
+
+// ── Constants ──────────────────────────────────────────────
+const INITIAL_EXPAND_DEPTH = 2;
+const ANIM_DURATION = 150;
+
+// ── Status Colors ──────────────────────────────────────────
+const STATUS_COLORS = {
+  active: "#4CAF50",
+  building: "#FF9800",
+  concept: "#9E9E9E",
+  design: "#2196F3",
+  paused: "#F44336",
+  maintenance: "#607D8B",
+  dormant: "#BDBDBD",
+  slow: "#FF9800",
+};
+
+// ── Initialize ─────────────────────────────────────────────
+function init() {
+  if (typeof ECOSYSTEM_DATA === "undefined") {
+    document.getElementById("canvas").innerHTML = "<p style='padding:40px;color:red;'>Error: No ecosystem data found.</p>";
+    return;
+  }
+
+  flattenTree(ECOSYSTEM_DATA, "");
+
+  setInitialExpanded(ECOSYSTEM_DATA, 0, INITIAL_EXPAND_DEPTH);
+
+  const totalFiles = state.flatNodes.filter(n => n.type === "file").length;
+  const totalDirs = state.flatNodes.filter(n => n.type === "directory").length;
+  document.getElementById("stats-text").textContent = `${totalFiles} files · ${totalDirs} dirs`;
+
+  renderTree();
+  setupEvents();
+  setupSettingsPanel();
+  startLivePolling();
+}
+
+function flattenTree(node, parentPath) {
+  const nodePath = node.path || parentPath + "/" + node.name;
+  state.flatNodes.push({
+    name: node.name,
+    path: nodePath,
+    type: node.type,
+    content: node.content || null,
+    meta: node.meta || {},
+  });
+  if (node.children) {
+    for (const child of node.children) {
+      flattenTree(child, nodePath);
+    }
+  }
+}
+
+function setInitialExpanded(node, depth, maxDepth) {
+  if (depth < maxDepth && node.type === "directory") {
+    state.expandedPaths.add(node.path);
+    if (node.children) {
+      for (const child of node.children) {
+        setInitialExpanded(child, depth + 1, maxDepth);
+      }
+    }
+  }
+}
+
+// ── Tree Rendering ─────────────────────────────────────────
+// Two-group pattern: outerG receives the d3.zoom transform unchanged so that
+// scale anchors at the cursor; g is the centered content group.
+let svg, outerG, g, zoomBehavior;
+
+function renderTree() {
+  const container = document.getElementById("canvas");
+  const width = container.clientWidth;
+  const height = container.clientHeight;
+
+  container.innerHTML = "";
+
+  svg = d3.select(container)
+    .append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+  outerG = svg.append("g").attr("class", "zoom-layer");
+  g = outerG.append("g")
+    .attr("class", "content-layer")
+    .attr("transform", `translate(${width / 2}, ${height / 2})`);
+
+  zoomBehavior = d3.zoom().scaleExtent([0.05, 8]);
+
+  // Trackpad-friendly gesture model (Figma / Miro / Excalidraw style):
+  //   two-finger scroll → pan, pinch (wheel + ctrlKey) → zoom, mouse drag → pan
+  setupTrackpadGestures(svg, zoomBehavior);
+
+  zoomBehavior.on("zoom", (event) => {
+    outerG.attr("transform", event.transform);
+  });
+
+  svg.call(zoomBehavior);
+
+  updateTree();
+  requestAnimationFrame(() => fitRadialToView());
+}
+
+function setupTrackpadGestures(svgSel, zoomB) {
+  // Tell d3.zoom to ignore plain wheel events. We'll route them ourselves.
+  zoomB.filter((event) => {
+    if (event.type === "wheel") {
+      // Let d3.zoom handle wheel events that should zoom: pinch (ctrlKey on
+      // trackpad) or modifier (Cmd / Ctrl). Plain wheels are panned below.
+      return event.ctrlKey || event.metaKey;
+    }
+    // Default: allow primary-button drag, ignore right-click
+    return !event.button;
+  });
+
+  // Tune wheel-to-zoom so pinch feels natural and not jumpy
+  zoomB.wheelDelta((event) => {
+    // Smaller multiplier than d3 default (-0.002) for finer pinch control
+    return -event.deltaY * (event.deltaMode === 1 ? 0.05 : 0.005);
+  });
+
+  // Manual pan handler — fires for any wheel without zoom modifier
+  svgSel.on("wheel.pan", (event) => {
+    if (event.ctrlKey || event.metaKey) return;  // d3.zoom is handling these
+    event.preventDefault();
+
+    const t = d3.zoomTransform(svgSel.node());
+    // Wheel deltas are in screen pixels; divide by scale so panning feels
+    // 1:1 with the cursor regardless of zoom level
+    const dx = -event.deltaX / t.k;
+    const dy = -event.deltaY / t.k;
+    svgSel.call(zoomB.translateBy, dx, dy);
+  }, { passive: false });
+}
+
+// Fit the current tree's bounding box into the viewport, including label
+// overhang. Called after a full render or layout change.
+function fitRadialToView() {
+  if (!g) return;
+  try {
+    const bbox = g.node().getBBox();
+    const container = document.getElementById("canvas");
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+
+    if (bbox.width === 0 || bbox.height === 0) return;
+
+    // Padding for labels at perimeter
+    const padding = 40;
+    const scale = Math.min(
+      (w - padding * 2) / bbox.width,
+      (h - padding * 2) / bbox.height,
+      1.0  // never zoom IN past 1.0 on initial fit
+    );
+
+    // The bbox is relative to g's local origin. g is translated to center.
+    // After applying outerG transform T = (x, y, k), a point p in g lands at
+    // (k * p + g_translate + T_translate) in screen space. We want bbox center
+    // → viewport center.
+    const bboxCenterX = bbox.x + bbox.width / 2;   // in g's local coords
+    const bboxCenterY = bbox.y + bbox.height / 2;
+    const gTx = w / 2;
+    const gTy = h / 2;
+    const tx = w / 2 - (gTx + bboxCenterX) * scale;
+    const ty = h / 2 - (gTy + bboxCenterY) * scale;
+
+    const transform = d3.zoomIdentity.translate(tx, ty).scale(scale);
+    svg.transition().duration(250).call(zoomBehavior.transform, transform);
+  } catch (e) {
+    // getBBox can throw on freshly-rendered SVGs in some browsers; ignore
+  }
+}
+
+function getVisibleTree(node) {
+  // Build a pruned tree: only include children of expanded directories
+  const clone = {
+    name: node.name,
+    path: node.path,
+    type: node.type,
+    meta: node.meta || {},
+    content: node.content || null,
+    _children: node.children || [],
+    _hasChildren: (node.children && node.children.length > 0),
+  };
+
+  if (node.type === "directory" && state.expandedPaths.has(node.path) && node.children) {
+    clone.children = node.children.map(c => getVisibleTree(c));
+  }
+
+  return clone;
+}
+
+function nodeLabel(d) {
+  let label = d.data.name;
+  if (d.data.type === "directory" && d.data._hasChildren) {
+    const isExpanded = state.expandedPaths.has(d.data.path);
+    const childCount = d.data._children ? d.data._children.length : 0;
+    if (!isExpanded && childCount > 0) {
+      label += ` (${childCount})`;
+    }
+  }
+  if (d.data.meta && d.data.meta.project_name && d.data.meta.project_name !== d.data.name) {
+    label = d.data.meta.project_name;
+  }
+  return label;
+}
+
+function nodeFillColor(d) {
+  if (d.data.type === "file") return "var(--node-file)";
+  if (d.data._hasChildren) return "var(--node-dir)";
+  return "var(--node-dir-empty)";
+}
+
+function nodeStrokeColor(d) {
+  if (d.data.type === "file") return "#4a8a5c";
+  return "var(--purple)";
+}
+
+function textClassFor(d) {
+  if (d.depth === 0) return "radial-root";
+  if (d.data.type === "directory" && d.data._hasChildren && state.expandedPaths.has(d.data.path)) {
+    return "expanded-dir";
+  }
+  return "radial";
+}
+
+function attachCommonHandlers(selection) {
+  selection.on("click", (event, d) => {
+    event.stopPropagation();
+
+    if (d.data.type === "directory" && d.data._hasChildren) {
+      if (state.expandedPaths.has(d.data.path)) {
+        state.expandedPaths.delete(d.data.path);
+      } else {
+        state.expandedPaths.add(d.data.path);
+      }
+      updateTree();
+    } else if (d.data.type === "file") {
+      openFile(d.data);
+    }
+  });
+
+  selection.on("mouseenter", (event, d) => {
+    const tooltip = document.getElementById("tooltip");
+    let text = d.data.path.replace(String.raw`${location.origin}`, "");
+
+    if (d.data.meta) {
+      if (d.data.meta.phase) text += `\nPhase: ${d.data.meta.phase}`;
+      if (d.data.meta.momentum) text += ` · Momentum: ${d.data.meta.momentum}`;
+      if (d.data.meta.next_action) text += `\nNext: ${d.data.meta.next_action}`;
+      if (d.data.meta.lines) text += `\n${d.data.meta.lines} lines`;
+      if (d.data.meta.size) text += ` · ${(d.data.meta.size / 1024).toFixed(0)} KB`;
+    }
+
+    tooltip.textContent = text;
+    tooltip.style.display = "block";
+    tooltip.style.left = (event.clientX + 12) + "px";
+    tooltip.style.top = (event.clientY - 8) + "px";
+  });
+
+  selection.on("mouseleave", () => {
+    document.getElementById("tooltip").style.display = "none";
+  });
+}
+
+function polarToCartesian(angle, radius) {
+  // Match d3's radial convention: 0 = up, increase clockwise. angle is in
+  // radians as set by d3.tree on the [0, 2π] axis.
+  const a = angle - Math.PI / 2;
+  return [radius * Math.cos(a), radius * Math.sin(a)];
+}
+
+function updateTree() {
+  const s = state.settings;
+  const visibleRoot = getVisibleTree(ECOSYSTEM_DATA);
+  const root = d3.hierarchy(visibleRoot);
+
+  // d3.tree (depth-proportional radius) — subtrees extend outward as deep
+  // as they need; shallow areas stay close to the center.
+  const maxDepth = d3.max(root.descendants(), d => d.depth) || 1;
+  const leafCount = root.leaves().length;
+  const arcRadius = (leafCount * s.leafArc) / (2 * Math.PI);
+  const radius = Math.max(maxDepth * s.ringSpacing, arcRadius, 240);
+
+  // Separation: large gap between different subtrees so the major branches
+  // visually break apart. Leaves of the same parent stay close.
+  const treeLayout = d3.tree()
+    .size([2 * Math.PI, radius])
+    .separation((a, b) => (a.parent === b.parent ? 1 : 4));
+
+  treeLayout(root);
+
+  // Pre-compute cartesian positions for every node (for both rendering and
+  // downstream label dodge).
+  for (const d of root.descendants()) {
+    const [cx, cy] = polarToCartesian(d.x, d.y);
+    d._cx = cx;
+    d._cy = cy;
+    d._side = (d.depth === 0) ? 0 : (d.x < Math.PI ? 1 : -1);  // 1=right, -1=left
+  }
+
+  // ── Links ──
+  const linkGenerator = d3.linkRadial().angle(d => d.x).radius(d => d.y);
+
+  const links = g.selectAll(".link")
+    .data(root.links(), d => d.target.data.path);
+
+  links.enter()
+    .append("path")
+    .attr("class", "link")
+    .attr("d", linkGenerator)
+    .attr("stroke", branchColor)
+    .attr("opacity", 0)
+    .transition().duration(ANIM_DURATION)
+    .attr("opacity", 0.55);
+
+  links.transition().duration(ANIM_DURATION)
+    .attr("d", linkGenerator)
+    .attr("stroke", branchColor);
+
+  links.exit()
+    .transition().duration(ANIM_DURATION)
+    .attr("opacity", 0)
+    .remove();
+
+  // ── Nodes ──
+  // Each node is a <g> at its cartesian position. Inside: a transparent
+  // hit-area circle (large), a visible circle (small), an optional status
+  // dot, an optional leader line for displaced labels, and a horizontal
+  // text label.
+  const nodes = g.selectAll(".node")
+    .data(root.descendants(), d => d.data.path);
+
+  const nodeEnter = nodes.enter()
+    .append("g")
+    .attr("class", "node")
+    .attr("transform", d => `translate(${d._cx},${d._cy})`)
+    .attr("opacity", 0);
+
+  // Hit-area (invisible, captures clicks generously)
+  nodeEnter.append("circle")
+    .attr("class", "hit-area")
+    .attr("r", s.hitRadius)
+    .attr("fill", "transparent")
+    .attr("pointer-events", "all");
+
+  // Visible circle
+  nodeEnter.append("circle")
+    .attr("class", "node-dot")
+    .attr("r", d => d.depth === 0 ? 9 : (d.data.type === "file" ? 3 : 5))
+    .attr("fill", nodeFillColor)
+    .attr("stroke", nodeStrokeColor)
+    .attr("stroke-width", d => d.depth === 0 ? 2 : 1);
+
+  // Status dot for projects with `phase` metadata
+  nodeEnter.filter(d => d.data.meta && d.data.meta.phase)
+    .append("circle")
+    .attr("class", "status-dot")
+    .attr("r", 3.5)
+    .attr("cx", d => d._side >= 0 ? -10 : 10)
+    .attr("cy", -10)
+    .attr("fill", d => STATUS_COLORS[d.data.meta.phase] || "#999");
+
+  // Leader line (drawn from node to displaced label position; created blank,
+  // shown only if dodge moves the label noticeably)
+  nodeEnter.append("line")
+    .attr("class", "label-leader")
+    .attr("x1", 0).attr("y1", 0)
+    .attr("x2", 0).attr("y2", 0)
+    .attr("stroke", "rgba(118, 74, 226, 0.25)")
+    .attr("stroke-width", 1)
+    .attr("display", "none");
+
+  // Label — horizontal, anchored based on which side of the wheel it's on.
+  // Expanded directories are styled as `.expanded-dir` (CSS hides them) so
+  // their children carry the visual signal instead of duplicating it.
+  nodeEnter.append("text")
+    .attr("class", textClassFor)
+    .style("font-size", d => d.depth === 0 ? `${s.fontSize + 4}px` : `${s.fontSize}px`)
+    .attr("dy", "0.32em")
+    .attr("x", d => {
+      if (d.depth === 0) return 0;
+      return d._side > 0 ? (s.hitRadius + 4) : -(s.hitRadius + 4);
+    })
+    .attr("y", d => d.depth === 0 ? -(s.hitRadius + 6) : 0)
+    .attr("text-anchor", d => {
+      if (d.depth === 0) return "middle";
+      return d._side > 0 ? "start" : "end";
+    })
+    .text(nodeLabel);
+
+  attachCommonHandlers(nodeEnter);
+
+  nodeEnter.transition().duration(ANIM_DURATION).attr("opacity", 1);
+
+  // Update existing nodes (positions, sizes that depend on settings)
+  nodes.transition().duration(ANIM_DURATION)
+    .attr("transform", d => `translate(${d._cx},${d._cy})`);
+
+  nodes.select(".hit-area").attr("r", s.hitRadius);
+  nodes.select(".node-dot")
+    .attr("r", d => d.depth === 0 ? 9 : (d.data.type === "file" ? 3 : 5));
+
+  nodes.select("text")
+    .attr("class", textClassFor)
+    .style("font-size", d => d.depth === 0 ? `${s.fontSize + 4}px` : `${s.fontSize}px`)
+    .text(nodeLabel)
+    .attr("x", d => {
+      if (d.depth === 0) return 0;
+      return d._side > 0 ? (s.hitRadius + 4) : -(s.hitRadius + 4);
+    })
+    .attr("y", d => d.depth === 0 ? -(s.hitRadius + 6) : 0)
+    .attr("text-anchor", d => {
+      if (d.depth === 0) return "middle";
+      return d._side > 0 ? "start" : "end";
+    });
+
+  nodes.select(".status-dot")
+    .attr("cx", d => d._side >= 0 ? -10 : 10);
+
+  nodes.exit()
+    .transition().duration(ANIM_DURATION)
+    .attr("opacity", 0)
+    .remove();
+
+  // Reset leader lines (will be re-shown by dodge if needed)
+  g.selectAll(".label-leader").attr("display", "none");
+
+  if (s.labelDodge) {
+    requestAnimationFrame(() => dodgeLabels(root));
+  }
+
+  if (state.searchQuery) {
+    applySearchHighlight();
+  }
+}
+
+function branchColor(d) {
+  // Color a link by its top-level branch ancestor.
+  const topAncestor = d.target.ancestors().slice(-2, -1)[0];
+  if (!topAncestor) return "#bbb";
+  const name = topAncestor.data.name;
+  if (name.includes("Playful")) return "var(--purple-light)";
+  if (name.includes("Claude") || name.includes("Digital Core")) return "#5A9E6F";
+  if (name.includes("Wisdom Personal")) return "#FF9800";
+  return "#bbb";
+}
+
+// Deterministic label de-collision. After d3.tree places nodes at (angle,
+// radius), labels are rendered horizontally next to each node — neighbours
+// at similar angles end up stacked. We measure every label, group by side
+// (left vs right of the wheel), sort by node-y, and walk top-to-bottom AND
+// bottom-to-top ensuring a minimum vertical gap. The two passes are then
+// averaged so the displacement is symmetric (rather than biasing everything
+// downward). Any label displaced by more than a few pixels gets a thin
+// leader line back to its node.
+//
+// `dodgeStrength` controls the minimum gap between adjacent labels — at 1.0
+// the gap is 2px; at 0 there's no padding (labels can touch); at 2.0 they
+// get a generous gap. A strength of 0 with `labelDodge` off lets labels
+// overlap freely.
+function dodgeLabels(root) {
+  const s = state.settings;
+  const labelHeight = s.fontSize + 4;
+  const baseGap = 2;
+  const gap = baseGap + Math.max(0, (s.dodgeStrength - 1)) * 6;
+
+  // Collect labels with their measured widths
+  const labels = [];
+  g.selectAll(".node").each(function(d) {
+    if (d.depth === 0) return;
+    // Skip hidden labels (expanded directories)
+    const textEl = this.querySelector("text");
+    if (!textEl) return;
+    if (textEl.classList.contains("expanded-dir")) return;
+    let width;
+    try {
+      width = textEl.getComputedTextLength() || (d.data.name.length * s.fontSize * 0.6);
+    } catch (e) {
+      width = d.data.name.length * s.fontSize * 0.6;
+    }
+    labels.push({
+      node: d,
+      el: this,
+      origCy: d._cy,
+      cy: d._cy,
+      width,
+      height: labelHeight,
+      side: d._side,
+    });
+  });
+
+  // Per-side stack pass. We also include labels within ~10° of the top/bottom
+  // boundary on the OPPOSITE side so labels straddling the vertical axis
+  // still de-collide with each other.
+  const NEAR_AXIS = Math.PI / 18;  // 10 degrees
+  function nearTopOrBottom(d) {
+    const a = d.x % (2 * Math.PI);
+    return a < NEAR_AXIS || a > (2 * Math.PI - NEAR_AXIS) ||
+           Math.abs(a - Math.PI) < NEAR_AXIS;
+  }
+
+  for (const side of [-1, 1]) {
+    const sideLabels = labels.filter(l =>
+      l.side === side || nearTopOrBottom(l.node)
+    );
+    if (sideLabels.length < 2) continue;
+
+    // Sort by original y (top to bottom)
+    sideLabels.sort((a, b) => a.origCy - b.origCy);
+
+    // Pass 1 — top-down: ensure each label is at least gap below the
+    // previous one's bottom edge.
+    let lastBottom = -Infinity;
+    const downward = sideLabels.map(l => {
+      const labTop = l.origCy - l.height / 2;
+      const yMin = lastBottom + gap;
+      const newCy = Math.max(l.origCy, yMin + l.height / 2);
+      lastBottom = newCy + l.height / 2;
+      return newCy;
+    });
+
+    // Pass 2 — bottom-up: ensure each label is at least gap above the
+    // next one's top edge.
+    let lastTop = Infinity;
+    const upward = new Array(sideLabels.length);
+    for (let i = sideLabels.length - 1; i >= 0; i--) {
+      const l = sideLabels[i];
+      const yMax = lastTop - gap;
+      const newCy = Math.min(l.origCy, yMax - l.height / 2);
+      upward[i] = newCy;
+      lastTop = newCy - l.height / 2;
+    }
+
+    // Average the two passes — symmetric displacement
+    for (let i = 0; i < sideLabels.length; i++) {
+      sideLabels[i].cy = (downward[i] + upward[i]) / 2;
+    }
+
+    // Final pass — re-enforce no-overlap (averaging can sometimes leave
+    // very small overlaps because of fractional cy)
+    for (let i = 1; i < sideLabels.length; i++) {
+      const prev = sideLabels[i - 1];
+      const curr = sideLabels[i];
+      const required = prev.cy + prev.height / 2 + gap + curr.height / 2;
+      if (curr.cy < required) curr.cy = required;
+    }
+  }
+
+  // Apply final positions
+  for (const lab of labels) {
+    const dy = lab.cy - lab.origCy;
+    const sel = d3.select(lab.el);
+
+    sel.select("text")
+      .transition().duration(120)
+      .attr("y", dy);
+
+    if (Math.abs(dy) > 3) {
+      const labelStartX = lab.side > 0 ? (s.hitRadius + 4) : -(s.hitRadius + 4);
+      sel.select(".label-leader")
+        .attr("display", null)
+        .attr("x1", 0).attr("y1", 0)
+        .attr("x2", labelStartX).attr("y2", dy);
+    }
+  }
+}
+
+// ── File Reader ────────────────────────────────────────────
+let clickDebounce = null;
+
+function openFile(data) {
+  // Debounce double-clicks
+  if (clickDebounce) return;
+  clickDebounce = setTimeout(() => { clickDebounce = null; }, 200);
+
+  // If this file is already open in a tab, just switch to it.
+  const existing = state.openTabs.findIndex(t => t.path === data.path);
+  if (existing >= 0) {
+    state.activeTabIndex = existing;
+  } else {
+    state.openTabs.push(data);
+    state.activeTabIndex = state.openTabs.length - 1;
+  }
+  state.readerMinimized = false;
+
+  renderTabs();
+  showActiveTab();
+}
+
+// Render the file currently at state.activeTabIndex into the reader.
+function showActiveTab() {
+  const tab = state.openTabs[state.activeTabIndex];
+  if (!tab) return;
+  const data = tab;
+
+  const reader = document.getElementById("reader");
+  const filename = document.getElementById("reader-filename");
+  const filepath = document.getElementById("reader-filepath");
+  const content = document.getElementById("reader-content");
+
+  reader.classList.add("open");
+  filename.textContent = data.name;
+  filepath.textContent = data.path;
+  state.selectedPath = data.path;
+  hidePill();
+
+  // Highlight selected node
+  d3.selectAll(".node .node-dot").attr("stroke-width", d =>
+    d && d.data && d.data.path === data.path ? 3 : 1
+  );
+
+  if (data.content) {
+    // Render markdown
+    try {
+      content.innerHTML = marked.parse(data.content);
+      wireMarkdownLinks(content, data);
+    } catch (e) {
+      content.innerHTML = `<pre>${escapeHtml(data.content)}</pre>`;
+    }
+  } else if (data.meta && data.meta.too_large) {
+    const sizeKB = data.meta.size ? (data.meta.size / 1024).toFixed(0) : "?";
+    content.innerHTML = `<div class="sw-reader-empty">File too large to embed (${sizeKB} KB)<br>Content excluded to keep the map fast.</div>`;
+  } else {
+    content.innerHTML = `<div class="sw-reader-empty">Content not available</div>`;
+  }
+
+  content.scrollTop = 0;
+}
+
+// minimizeReader: hide the reader panel but keep all open tabs intact.
+// Triggered by canvas clicks, the reader's left-arrow button, and Esc.
+function minimizeReader() {
+  document.getElementById("reader").classList.remove("open");
+  state.selectedPath = null;
+  state.readerMinimized = true;
+  d3.selectAll(".node .node-dot").attr("stroke-width", d => d && d.depth === 0 ? 2 : 1);
+  if (state.openTabs.length > 0) showPill();
+}
+
+// closeAllTabs: forget every open file. Called when you press × on the pill.
+function closeAllTabs() {
+  state.openTabs = [];
+  state.activeTabIndex = -1;
+  state.readerMinimized = false;
+  document.getElementById("reader").classList.remove("open");
+  state.selectedPath = null;
+  hidePill();
+  renderTabs();
+  d3.selectAll(".node .node-dot").attr("stroke-width", d => d && d.depth === 0 ? 2 : 1);
+}
+
+// closeTab: remove a specific tab. If it was active, switch to a neighbor.
+function closeTab(index) {
+  if (index < 0 || index >= state.openTabs.length) return;
+  state.openTabs.splice(index, 1);
+
+  if (state.openTabs.length === 0) {
+    closeAllTabs();
+    return;
+  }
+
+  // Adjust active index
+  if (index < state.activeTabIndex) {
+    state.activeTabIndex--;
+  } else if (index === state.activeTabIndex) {
+    state.activeTabIndex = Math.min(index, state.openTabs.length - 1);
+  }
+
+  renderTabs();
+  if (!state.readerMinimized) showActiveTab();
+  else if (state.openTabs.length > 0) showPill();
+}
+
+function activateTab(index) {
+  if (index < 0 || index >= state.openTabs.length) return;
+  state.activeTabIndex = index;
+  state.readerMinimized = false;
+  renderTabs();
+  showActiveTab();
+}
+
+// Render the tab strip from current state.openTabs / activeTabIndex.
+function renderTabs() {
+  const strip = document.getElementById("tab-strip");
+  strip.innerHTML = "";
+
+  state.openTabs.forEach((tab, i) => {
+    const el = document.createElement("button");
+    el.className = "sw-tab" + (i === state.activeTabIndex ? " active" : "");
+    el.title = tab.path;
+
+    const name = document.createElement("span");
+    name.className = "tab-name";
+    name.textContent = tab.name;
+    el.appendChild(name);
+
+    const x = document.createElement("button");
+    x.className = "tab-x";
+    x.textContent = "×";
+    x.title = "Close tab";
+    x.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeTab(i);
+    });
+    el.appendChild(x);
+
+    el.addEventListener("click", () => activateTab(i));
+    strip.appendChild(el);
+  });
+}
+
+function showPill() {
+  const pill = document.getElementById("minimized-pill");
+  const name = document.getElementById("pill-name");
+  const n = state.openTabs.length;
+  name.textContent = n === 1
+    ? state.openTabs[0].name
+    : `${n} files open`;
+  pill.classList.add("visible");
+}
+
+function hidePill() {
+  document.getElementById("minimized-pill").classList.remove("visible");
+}
+
+// Restore reader from minimized state (pill click)
+function restoreReader() {
+  if (state.openTabs.length === 0) return;
+  state.readerMinimized = false;
+  if (state.activeTabIndex < 0) state.activeTabIndex = 0;
+  renderTabs();
+  showActiveTab();
+}
+
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Wire up <a> elements in rendered markdown so that links to local .md files
+// open in the canvas reader instead of trying to navigate the page. External
+// links (http/https/mailto) open in a new tab.
+function wireMarkdownLinks(container, currentFile) {
+  // Compute the directory the current file lives in (for resolving relative links)
+  const currentDir = currentFile.path.substring(0, currentFile.path.lastIndexOf("/"));
+
+  container.querySelectorAll("a[href]").forEach(a => {
+    const href = a.getAttribute("href") || "";
+
+    // External link — open in new tab, don't intercept
+    if (/^(https?|mailto|tel):/i.test(href)) {
+      a.setAttribute("target", "_blank");
+      a.setAttribute("rel", "noopener noreferrer");
+      return;
+    }
+
+    // Anchor-only link — let the browser scroll
+    if (href.startsWith("#")) return;
+
+    // Resolve to an absolute path
+    let resolved;
+    if (href.startsWith("/")) {
+      resolved = href;
+    } else if (href.startsWith("~/")) {
+      // Best-effort: home is the path prefix common to all roots
+      resolved = href.replace(/^~/, currentDir.split("/").slice(0, 3).join("/"));
+    } else {
+      resolved = resolvePath(currentDir, href);
+    }
+
+    // Find the target in our flat index
+    const target = state.flatNodes.find(n => n.path === resolved);
+
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (target && target.type === "file") {
+        openFile(target);
+      } else {
+        // Fall back: try a fuzzy match by basename
+        const basename = resolved.split("/").pop();
+        const fuzzy = state.flatNodes.find(n =>
+          n.type === "file" && n.path.endsWith("/" + basename)
+        );
+        if (fuzzy) {
+          openFile(fuzzy);
+        } else {
+          // Show a brief inline notice
+          const note = document.createElement("span");
+          note.style.cssText = "color: #c0392b; font-size: 11px; margin-left: 6px;";
+          note.textContent = ` (not in canvas: ${basename})`;
+          a.appendChild(note);
+          setTimeout(() => note.remove(), 2000);
+        }
+      }
+    });
+
+    // Visual hint that this is a navigable link
+    a.style.cursor = "pointer";
+    if (target) a.title = `Open ${target.name}`;
+  });
+}
+
+// Resolve a relative path against a base directory (handles "..", ".", etc.)
+function resolvePath(base, rel) {
+  const parts = (base + "/" + rel).split("/");
+  const out = [];
+  for (const p of parts) {
+    if (p === "" || p === ".") continue;
+    if (p === "..") out.pop();
+    else out.push(p);
+  }
+  return "/" + out.join("/");
+}
+
+// ── Search ─────────────────────────────────────────────────
+let searchTimeout = null;
+
+function handleSearch(query) {
+  state.searchQuery = query.toLowerCase().trim();
+
+  if (searchTimeout) clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    if (state.searchQuery) {
+      // Auto-expand paths to matching nodes
+      const matches = state.flatNodes.filter(n => {
+        const nameMatch = n.name.toLowerCase().includes(state.searchQuery);
+        const contentMatch = n.content && n.content.toLowerCase().includes(state.searchQuery);
+        return nameMatch || contentMatch;
+      });
+
+      // Expand ancestor paths for matches
+      for (const match of matches) {
+        expandAncestors(match.path);
+      }
+
+      updateTree();
+      applySearchHighlight();
+    } else {
+      // Clear highlighting
+      d3.selectAll(".node text").classed("dimmed", false).classed("highlighted", false);
+      d3.selectAll(".link").classed("dimmed", false);
+    }
+  }, 200);
+}
+
+function expandAncestors(filePath) {
+  // Walk up the path and expand each directory
+  const parts = filePath.split("/");
+  for (let i = 1; i < parts.length - 1; i++) {
+    const ancestorPath = parts.slice(0, i + 1).join("/");
+    // Find if this is a directory in our data
+    const node = state.flatNodes.find(n => n.path === ancestorPath && n.type === "directory");
+    if (node) {
+      state.expandedPaths.add(ancestorPath);
+    }
+  }
+}
+
+function applySearchHighlight() {
+  if (!state.searchQuery) return;
+
+  d3.selectAll(".node text").each(function(d) {
+    if (!d || !d.data) return;
+    const el = d3.select(this);
+    const nameMatch = d.data.name.toLowerCase().includes(state.searchQuery);
+    const flatNode = state.flatNodes.find(n => n.path === d.data.path);
+    const contentMatch = flatNode && flatNode.content && flatNode.content.toLowerCase().includes(state.searchQuery);
+
+    if (nameMatch || contentMatch) {
+      el.classed("highlighted", true).classed("dimmed", false);
+    } else {
+      el.classed("highlighted", false).classed("dimmed", true);
+    }
+  });
+
+  d3.selectAll(".link").classed("dimmed", true);
+}
+
+// ── Divider Resize ─────────────────────────────────────────
+function setupDivider() {
+  const divider = document.getElementById("divider");
+  const reader = document.getElementById("reader");
+  let isResizing = false;
+
+  divider.addEventListener("mousedown", (e) => {
+    isResizing = true;
+    divider.classList.add("active");
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    e.preventDefault();
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!isResizing) return;
+    const containerWidth = document.querySelector(".sw-main").clientWidth;
+    const newReaderWidth = containerWidth - e.clientX;
+    const clampedWidth = Math.max(280, Math.min(containerWidth * 0.7, newReaderWidth));
+    reader.style.width = clampedWidth + "px";
+  });
+
+  document.addEventListener("mouseup", () => {
+    if (isResizing) {
+      isResizing = false;
+      divider.classList.remove("active");
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      // Re-render tree to fit new canvas size
+      updateTree();
+    }
+  });
+}
+
+// ── Events ─────────────────────────────────────────────────
+function setupEvents() {
+  document.getElementById("search-input").addEventListener("input", (e) => {
+    handleSearch(e.target.value);
+  });
+
+  // Reader: arrow button → minimize (keep file in pill)
+  document.getElementById("reader-close").addEventListener("click", minimizeReader);
+
+  // Reader: copy current file's path
+  document.getElementById("copy-path").addEventListener("click", () => {
+    const tab = state.openTabs[state.activeTabIndex];
+    if (!tab) return;
+    const btn = document.getElementById("copy-path");
+    navigator.clipboard.writeText(tab.path).then(() => {
+      btn.classList.add("copied");
+      const orig = btn.textContent;
+      btn.textContent = "✓";
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.textContent = orig;
+      }, 1100);
+    }).catch(() => {});
+  });
+
+  // Pill: click body → restore reader with all tabs
+  document.getElementById("minimized-pill").addEventListener("click", (e) => {
+    if (e.target.id === "pill-close" || e.target.closest("#pill-close")) return;
+    restoreReader();
+  });
+
+  // Pill: × → close all tabs
+  document.getElementById("pill-close").addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeAllTabs();
+  });
+
+  // Canvas click on empty space → minimize the reader (don't lose the file)
+  document.getElementById("canvas").addEventListener("click", (e) => {
+    // d3.zoom captures clicks on nodes via the SVG event chain; if the click
+    // didn't hit a node group, it lands on the SVG itself (or zoom-layer).
+    const isNode = e.target.closest(".node");
+    if (!isNode && document.getElementById("reader").classList.contains("open")) {
+      minimizeReader();
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      // First Esc: minimize. Second Esc (no file open): clear search.
+      if (document.getElementById("reader").classList.contains("open")) {
+        minimizeReader();
+      } else {
+        document.getElementById("search-input").value = "";
+        handleSearch("");
+      }
+      document.getElementById("settings-panel").classList.remove("open");
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+      e.preventDefault();
+      document.getElementById("search-input").focus();
+    }
+  });
+
+  setupDivider();
+
+  // Re-render on window resize so the tree refits the viewport
+  let resizeTimer;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => renderTree(), 120);
+  });
+}
+
+// ── Settings Panel ─────────────────────────────────────────
+function setupSettingsPanel() {
+  const btn = document.getElementById("settings-btn");
+  const panel = document.getElementById("settings-panel");
+
+  btn.addEventListener("click", () => {
+    panel.classList.toggle("open");
+  });
+
+  // Click outside to close
+  document.addEventListener("click", (e) => {
+    if (!panel.contains(e.target) && e.target !== btn) {
+      panel.classList.remove("open");
+    }
+  });
+
+  const fields = ["fontSize", "ringSpacing", "leafArc", "hitRadius", "dodgeStrength"];
+  for (const key of fields) {
+    const input = document.getElementById(`set-${key}`);
+    const valEl = document.getElementById(`set-${key}-val`);
+    input.value = state.settings[key];
+    valEl.textContent = formatSettingValue(key, state.settings[key]);
+
+    input.addEventListener("input", () => {
+      state.settings[key] = parseFloat(input.value);
+      valEl.textContent = formatSettingValue(key, state.settings[key]);
+      saveSettings();
+      updateTree();
+    });
+  }
+
+  const dodge = document.getElementById("set-labelDodge");
+  dodge.checked = state.settings.labelDodge;
+  dodge.addEventListener("change", () => {
+    state.settings.labelDodge = dodge.checked;
+    saveSettings();
+    updateTree();
+  });
+
+  document.getElementById("set-reset").addEventListener("click", () => {
+    state.settings = { ...SETTINGS_DEFAULTS };
+    saveSettings();
+    setupSettingsPanelValues();
+    renderTree();
+  });
+}
+
+function setupSettingsPanelValues() {
+  // Re-sync the panel inputs from state.settings (used after reset)
+  const fields = ["fontSize", "ringSpacing", "leafArc", "hitRadius", "dodgeStrength"];
+  for (const key of fields) {
+    const input = document.getElementById(`set-${key}`);
+    const valEl = document.getElementById(`set-${key}-val`);
+    input.value = state.settings[key];
+    valEl.textContent = formatSettingValue(key, state.settings[key]);
+  }
+  document.getElementById("set-labelDodge").checked = state.settings.labelDodge;
+}
+
+function formatSettingValue(key, val) {
+  if (key === "fontSize" || key === "ringSpacing" || key === "leafArc" || key === "hitRadius") {
+    return `${Math.round(val)}px`;
+  }
+  if (key === "dodgeStrength") {
+    return val.toFixed(1);
+  }
+  return val;
+}
+
+// ── Live Reload (polls a snapshot hash from companion server) ──
+let liveReloadHash = null;
+
+function startLivePolling() {
+  const dot = document.getElementById("live-dot");
+
+  // Try to fetch a hash file. If served by watch-server.py, this tells us
+  // when the canvas has been regenerated. If absent, the dot stays gray.
+  async function poll() {
+    try {
+      const res = await fetch("__snapshot.json?ts=" + Date.now(), { cache: "no-store" });
+      if (!res.ok) throw new Error("no live server");
+      const data = await res.json();
+
+      if (liveReloadHash === null) {
+        liveReloadHash = data.hash;
+        dot.classList.add("live");
+        dot.title = `Live · last regen ${new Date(data.generated_at * 1000).toLocaleTimeString()}`;
+      } else if (data.hash !== liveReloadHash) {
+        dot.classList.remove("live");
+        dot.classList.add("refreshing");
+        dot.title = "Reloading…";
+        // Hard reload to pick up the new embedded data
+        setTimeout(() => location.reload(), 250);
+      }
+    } catch (err) {
+      // Snapshot endpoint not available — silent (file:// or no watch server)
+      dot.classList.remove("live", "refreshing");
+      dot.title = "Live updates not connected (run watch-server.py)";
+    }
+  }
+
+  poll();
+  setInterval(poll, 2000);
+}
+
+// ── Boot ───────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>
