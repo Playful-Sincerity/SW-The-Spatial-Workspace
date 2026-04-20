@@ -27,7 +27,7 @@ Running log of ideas Wisdom surfaces during live work that we can't address in t
 
 ---
 
-### 2026-04-17 — Zoom-dependent cluster labels
+### ~~2026-04-17 — Zoom-dependent cluster labels~~ *(shipped — likely rolled in with the 2026-04-19 progressive zoom-coupled sizing work; parent folder wayfinding at zoom-out is working)*
 
 **Context:** Phase 3B layout iteration; Wisdom zooming out on branch-expand and losing orientation.
 **Idea:** When zoomed out past a threshold, overlay the parent name (e.g. "Playful Sincerity", "inbox") centered on that cluster's bounding box. As you zoom out, the label grows to stay readable. Only the top 2-3 tiers get labels — deeper ones would clutter. These are overlay labels, not node buttons — they sit on top of the cluster's children and provide wayfinding at macro scale.
@@ -68,7 +68,7 @@ Running log of ideas Wisdom surfaces during live work that we can't address in t
 
 ---
 
-### 2026-04-17 — Search within a folder that opens the path to the hit
+### ~~2026-04-17 — Search within a folder that opens the path to the hit~~ *(shipped 2026-04-19 — right-click "Search in this folder" + scope chip, progressive one-tier Enter, Shift+Enter collapse, ⌘+Enter full expand)*
 
 **Context:** Stage 1 bag-node session. Discussing what happens when a "bag" node is clicked (drawer vs. spatial).
 **Idea:** "Ideally you're able to actually search within a folder... just search within a folder click something and then it opens it, it opens the fan, it opens the different paths to get to that thing if you search within that folder."
@@ -84,15 +84,22 @@ Running log of ideas Wisdom surfaces during live work that we can't address in t
 
 ---
 
-### 2026-04-17 — Lines repurposed as cross-linkages (not parent-child)
+### 2026-04-17 — Cross-linkage lines alongside parent-child lines (both, toggleable) *(reframed 2026-04-20 — no longer repurpose)*
 
-**Context:** Stage 1 pivot discussion. When proposing recursive circle packing (containment as hierarchy signal), Wisdom worked through the implication that parent-child lines go away. Live reframe: *"the lines eventually could be more like linkages, cross-linkages or something — that's interesting, that could be better actually."*
-**Idea:** In the containment layout, hierarchy is shown by nesting (child circle sits inside parent circle). Parent-child edges are no longer needed — but that frees the line primitive to represent something it's actually better for: the semantic cross-references between files (e.g. `[text](path)` markdown links). The generator already extracts these via `MD_LINK_RE` in `generator/generate-ecosystem.py:60` — they're in the data, just not rendered on the canvas today.
-**Why it matters:** Decouples hierarchy (solved by containment) from semantic connection (solved by cross-link edges). A file in `PS Research/ULP/` that cross-links to `PS Research/Gravitationalism/GCM/` has a real semantic relationship that the tree-containment alone can't show. Drawing that as a curve between the two circles would make the ecosystem's real connective tissue visible for the first time.
+**Context:** Original 2026-04-17 framing (Stage 1 pivot): cross-links were going to *replace* parent-child lines in a containment layout. Reframed 2026-04-20: keep parent-child lines, add cross-linkage lines as a **second line type**, with toggle options.
+**Idea:** Two distinct line layers on the canvas:
+1. **Parent-child lines** — the existing structural lines that show tree hierarchy.
+2. **Cross-linkage lines** — semantic edges between files that reference each other (e.g. `[text](path)` markdown links). Already extracted via `MD_LINK_RE` in `generator/generate-ecosystem.py:60`, just not rendered today.
+
+Both rendered with distinct visual treatment so they don't get confused (different color, line style, curvature — structural edges probably crisp/straight, cross-links probably thinner/curved/lower-contrast or a distinct hue).
+
+**Toggle controls:** a UI affordance to turn each layer on/off independently. Four states: both on, only structural, only cross-links, neither. *"All the physics works the same kind of thing"* — Wisdom wants the toggle pattern to feel consistent with how other canvas options work.
+**Why the reframe:** The original "repurpose" framing assumed a containment-only layout that's now parked (see 2026-04-17 containment-pack entry — not the primary mode). In the current radial/dynamic layout, parent-child lines are load-bearing for showing hierarchy. Cross-links add a new signal layer; they don't replace the old one. Having both visible together also lets the user see how hierarchy and semantic connection diverge — files that are structurally far apart but semantically linked are exactly the insight cross-links exist to surface.
 **Rough shape:**
-- Phase 1 (this session): circle packing replaces radial tree; no lines at all; hierarchy = containment.
-- Phase 2 (later): overlay SVG paths for extracted cross-links; thin, low-contrast, curved (d3-hierarchy-bundling or similar) so they don't dominate.
-- Phase 3 (later still): filter/toggle cross-link visibility; cluster-mode bundling at zoom-out; per-file "show my links" reveal.
+- Phase 1: add cross-link rendering as a second SVG layer, hidden by default. Thin, curved (d3-hierarchy-bundling or similar), distinct color/hue.
+- Phase 2: toggle control in the canvas header (or in the legend-as-control pill from the 2026-04-19 entry). Two toggles: "Show structure" / "Show cross-links."
+- Phase 3: per-file "show my links" reveal — click a node, only that node's cross-links light up. Pairs naturally with the 2026-04-19 perpendicular-wedge-terminator entry — the terminator glyph makes cross-link endpoints legible.
+- Phase 4: cluster-mode bundling at zoom-out so cross-links don't create visual noise at scale.
 
 ---
 
@@ -208,7 +215,7 @@ Running log of ideas Wisdom surfaces during live work that we can't address in t
 
 ---
 
-### 2026-04-19 — "List view" option in the folder right-click menu
+### ~~2026-04-19 — "List view" option in the folder right-click menu~~ *(shipped — right-click menu option lists folder contents in the reader panel with clickable file links)*
 
 **Context:** Build-queue capture session. Pairs with the earlier 2026-04-19 right-click menu entry ("Bulk-expand: open all children one tier down"). Same right-click menu, another option.
 **Idea:** Add a **"List view"** option to the right-click context menu on folder nodes. When clicked, the side viewer (the panel that currently shows markdown files) displays a **flat list of all files inside that folder, each linked** — click any entry to open that file in the reader. The canvas doesn't have to change at all; this is purely a reader-panel affordance for browsing a folder's contents textually instead of spatially.
@@ -227,7 +234,7 @@ Running log of ideas Wisdom surfaces during live work that we can't address in t
 
 ---
 
-### 2026-04-19 — Progressive zoom-coupled sizing for parent folders (orient-at-zoom-out)
+### ~~2026-04-19 — Progressive zoom-coupled sizing for parent folders (orient-at-zoom-out)~~ *(shipped 2026-04-19 — inverse-zoom formula, tier factors, z-order by depth; tuned iteratively)*
 
 **Context:** Build-queue capture session. Related to the earlier 2026-04-17 "Zoom-dependent cluster labels" entry but distinct — that was about overlay labels on bounding boxes; this is about the parent folder nodes/labels themselves scaling continuously with zoom.
 **Idea:** Parent folder sizes are **inversely coupled to zoom level**. As you zoom out, parent (and especially grandparent and further ancestors) folder nodes/labels **grow progressively larger** to stay legible. As you zoom in, they shrink back down so they don't overwhelm the leaves you're focused on. At max zoom-out — the full ecosystem view — the main top-tier folders should be big and readable enough that you can orient yourself at a glance: "PS is over there, Wisdom Personal is over there, claude-system is over there."
@@ -266,6 +273,123 @@ Running log of ideas Wisdom surfaces during live work that we can't address in t
 - Debounce/coalesce: multiple rapid state changes (e.g. watch-server regenerations, quick clicks) should batch into one layout pass, not N.
 - Preload + warm cache: first-paint speed matters for the demo moment.
 **Status:** Theme entry, not a single-session build. When Wisdom is ready to tackle this, it probably deserves its own `ideas/YYYY-MM-DD-performance-pass.md` exploration doc and a benchmark harness before any specific fix — measure first, optimize with evidence.
+
+---
+
+### 2026-04-19 — Legend-as-control: visualization type menu + clickable time-period filters
+
+**Context:** Build-queue capture session. Extends the "edited color" view (where node color encodes recency of edit) into an interactive control surface.
+**Idea:** Two nested interactions, both housed in the legend/pill itself:
+1. **The whole legend pill is a button.** Clicking it opens an options menu of different **visualization types** — color-by-edit-date is just one; eventually there should be several (color by file size, by type/extension, by cluster, by depth, by semantic tag, by git activity, etc.). The menu lets you pick which lens you're currently viewing the canvas through.
+2. **Within a type, each bucket label is itself a clickable filter.** In edit-color view, the legend currently shows bands like "last week / last 2 weeks / last month / older." If you click "last month," the canvas **filters to only light up nodes edited in that specific window** — everything outside that window dims or goes unlit. Click it again to deselect. Click another to switch. The labels are the legend AND the filter.
+**Why it matters:**
+- Part 1 closes the "how do I switch visualization modes?" question with a natural home (the legend already tells you *what* you're seeing; making it the control to change *what you see* is coherent).
+- Part 2 turns the legend from a passive key into an interactive filter. Instead of *reading* which nodes were edited in the last month, you *isolate* them. Huge for answering "what did I actually do this week?" at a glance.
+- This is one concrete instance of the 2026-04-17 "Live reorganization UI" entry — the "axes of organization" idea landed on a specific UX: legend-as-control.
+**Implementation notes from Wisdom:**
+- Different visualization options probably grow over time — the menu should be extensible.
+- Time-period filters: click to isolate, click again to clear (or click a different period to switch).
+- Described as "only see lit-up things that have been done in last month" — so the filter dims/hides the others rather than removing them; the structure stays visible, only the coloring changes.
+**Rough shape:**
+- Legend pill gets `role="button"` + click handler → opens dropdown of visualization modes (initial list: edit-date, size, type, cluster).
+- Each mode defines (a) how it colors nodes, (b) what bucket labels appear in its legend.
+- Bucket labels in the legend are individually clickable. Active filter = that bucket's nodes at full saturation, others at reduced opacity (or desaturated to grey).
+- State: `activeVisualization` + `activeBucket` (nullable). When a bucket is active, the color function becomes `node ∈ bucket ? saturated_color : dim_color`.
+- Plays well with: the "save+restore views" phase of the Live Reorganization entry — a saved view is just `{visualization, activeBucket, …}`.
+
+---
+
+### 2026-04-20 — Multi-filetype support (beyond markdown) on canvas and in the viewer
+
+**Context:** Build-queue capture session. Today the canvas and file viewer are effectively markdown-only — other file types either don't appear on the canvas or can't be opened in the reader panel.
+**Idea:** Generalize the canvas + viewer to handle **any file type**: images (PNG, JPG, SVG, GIF, WebP), PDFs, code files (.py, .js, .ts, .html, .css, .json, .yaml, .sh, etc.), plain text, and whatever else lives in the ecosystem. Every file shows up as a node on the canvas, and every file is openable in the side viewer with an appropriate renderer.
+**Why it matters:** Wisdom's ecosystem is not just markdown — it's code, generated images, PDFs, configs, data files, prototypes. A spatial workspace that only shows markdown is rendering a partial map. Full filetype coverage is the difference between "a markdown index" and "a real workspace." Also unlocks use cases: scanning visual assets, reading source code in place, previewing PDFs without leaving the canvas.
+**Implementation notes:**
+- Canvas side: extend the scanner / generator to include all file types (or at least a broad default set), not just `.md`. Leaf nodes for code/images/PDFs render the same as markdown leaves, with filetype-appropriate icon/color to distinguish at a glance.
+- Viewer side: a pluggable renderer system in the reader panel that picks based on file extension:
+  - `.md` → existing markdown renderer
+  - `.png/.jpg/.svg/.gif/.webp` → `<img>` tag with size-fit
+  - `.pdf` → `<embed>` / `<iframe>` or PDF.js for native preview
+  - `.py/.js/.ts/.html/.css/.json/.yaml/.sh/.txt` → syntax-highlighted code view (Prism.js or Highlight.js — both lightweight, no bundler needed)
+  - Unknown / binary → "open in system default" fallback button
+- Exclusion list still applies — the scanner should ignore `node_modules`, `.git`, `__pycache__`, build artifacts, huge binaries, etc. (probably already does for markdown; extend for general files).
+- Consider: size threshold for what gets rendered inline vs. "this file is too large — open externally."
+**Rough shape:**
+- Extend scanner config in `config.json` to include a filetype whitelist (or just "all non-ignored files").
+- In the reader panel, add a dispatch function that picks a renderer by extension.
+- Icon/color map per filetype on the canvas — e.g. images tinted one color, code another, markdown unchanged, PDFs another — so filetype is legible spatially.
+- Pairs with the 2026-04-19 legend-as-control entry: "color by filetype" becomes another visualization mode in that menu.
+
+---
+
+### 2026-04-20 — Expand should zoom *into* the newly expanded folder, not zoom out to fit the whole canvas
+
+**Context:** Build-queue capture session. UX behavior change for expand. Today: expanding a folder triggers a zoom-out to fit the whole canvas (or a re-fit that effectively pulls the view away from what was just expanded). Desired: zoom focus follows the expansion target.
+**Idea:** When you expand an individual folder — no matter how much else is already expanded around it — the view should **zoom in and recenter on the newly-expanded folder and its new children**, not zoom out to re-fit everything. The user's attention is on the thing they just clicked; the view should follow their attention.
+**Why it matters:** The current behavior actively works against the user — clicking to see more of *X* results in seeing less of *X* (because the view zooms out to accommodate all of X plus everything else on the canvas). Every expand becomes a disorienting "where did my thing go?" moment. Expand is the most frequent canvas gesture; getting this right is load-bearing for the whole interaction model.
+**Desired behavior:**
+- Target bbox = the expanded folder + its immediate children (same bbox the file-click-recenter uses via `centerOnFileWithParent`).
+- Zoom and pan so that target bbox fills (or fills most of) the visible canvas area, with some padding.
+- Smooth animation into the new view; don't snap.
+- Leaves siblings/other-expanded-areas still present in the DOM, just off-screen or at the edges of the view.
+**Why it's distinct from the 2026-04-16 "Go to canvas" button behavior:** That one centers on a specific file the user asked to locate. This one auto-focuses on whatever was *just expanded*, without the user asking for recenter. Same underlying primitive (center-on-bbox), different trigger.
+**Rough shape:**
+- Find the expand handler in [templates/v2/app.js](../templates/v2/app.js) (the code path that adds the folder's path to `expandedPaths` and triggers `updateTree()`).
+- After layout settles (post-updateTree), compute the bbox of the just-expanded folder + its new children.
+- Call the existing center-on-bbox / `centerOnFileWithParent`-style function with that bbox.
+- Remove (or gate behind a flag) the existing "re-fit whole canvas" behavior that's happening on expand today.
+- Gotcha to watch for: the bulk-expand gesture (from the 2026-04-19 right-click "Expand children" entry) expands many folders at once — that case probably should fit the cluster's overall bbox, not zoom to any one child. Single-folder expand = zoom into that one; multi-folder expand = fit the affected cluster.
+
+---
+
+### 2026-04-20 — Physics button: remove OR redesign to match the design system
+
+**Context:** Build-queue capture session. Small UI simplification / polish decision.
+**Idea:** The physics button is currently subpar — Wisdom isn't using it AND it looks off (icon dated, probably not aligned with its neighbors, doesn't sit cleanly in the design system). Two acceptable outcomes:
+1. **Remove it entirely** — simpler. Not in active use; every visible control is a small cognitive tax. Makes room for controls that *are* load-bearing (right-click menu, legend-as-control, etc.). Can come back if a real use case surfaces.
+2. **Or at least polish it** — if we keep it: modernize the icon, verify alignment with adjacent header buttons, tighten spacing/sizing to match the rest of the UI. Should feel like a native member of the header, not a holdover.
+**Why it matters:** Either outcome fixes the same underlying issue — right now the button is visual noise that doesn't earn its place. Wisdom's preference leans remove; polish is the floor.
+**Implementation notes:**
+- If removing: find the physics button in [templates/v2/template.html](../templates/v2/template.html) and its handler in [templates/v2/app.js](../templates/v2/app.js); delete button + listener + any orphaned CSS. If the underlying physics toggle logic is referenced elsewhere, leave the internal machinery but sever the UI surface.
+- If polishing: audit the header's other buttons (search, markmap/radial toggle, etc.) to identify the design-system pattern — icon style (line weight, corner radius, size), spacing, hover/active states. Match the physics button to that pattern exactly. Icon should probably be a modern, minimal line-weight glyph consistent with the others.
+- Decision can wait for the moment Wisdom is in the code — this is a "pick one and do it" not a "both options need design work."
+**Relationship to other entries:**
+- Revisit keep-vs-remove if the whole-workspace performance pass (2026-04-19 entry) surfaces physics-tuning use cases.
+
+---
+
+### 2026-04-20 — Filter/isolate by filetype ("only show markdown," "only show images")
+
+**Context:** Build-queue capture session. Surfaced after the multi-filetype support entry — once multiple filetypes exist on the canvas, the natural next want is to *isolate* one.
+**Idea:** A filetype-sort / filetype-filter mode where the user can choose to see only a specific filetype at a time. Right now everything is markdown so the question is moot; as soon as the canvas shows code, images, PDFs, etc., you'll want "only markdowns" or "only images" views — either dimming the other filetypes or removing them from the render entirely.
+**Why it matters:**
+- **Cognitive focus:** "Show me the whole codebase" and "show me the whole knowledge layer" are two different mental modes. A mixed canvas with all filetypes is visual noise for whichever mode you're in at the moment.
+- **New visualizations per type:** Wisdom specifically named this — *"or only see a new visualization of just those things."* Once isolated, a filetype could get a renderer tuned to it (code files arranged by dependency graph, images laid out in a contact-sheet grid, PDFs clustered by size/recency, etc.). Filtering is the door; type-specific visualizations are the room.
+**How it fits the existing pattern:**
+- This is another instance of the 2026-04-19 legend-as-control entry. "Filetype" becomes a visualization mode in the pill dropdown; the legend bucket labels (markdown, images, code, PDFs, …) are individually clickable to isolate. Click "markdown" = only markdowns lit; others dim or hide. Click again to clear.
+- Also composes with the 2026-04-17 Live Reorganization UI entry — filetype is one of the "axes of organization" that entry anticipated.
+- Depends on 2026-04-20 multi-filetype support landing first; until the canvas actually shows multiple filetypes, there's nothing to filter.
+**Rough shape:**
+- Add "by filetype" to the visualization mode menu on the legend pill.
+- When active, legend shows one bucket per filetype present in the current tree (derived, not hardcoded — so if the user has `.py` but no `.pdf`, only `.py` shows).
+- Clicking a bucket isolates that filetype. Two isolation modes worth considering: (a) **dim** — others still visible but desaturated/low-opacity, structure preserved; (b) **hide** — others collapse out entirely, layout re-flows to use the space. Default probably dim; hide as a modifier-click or secondary toggle.
+- Longer-term: per-filetype custom layout — when "images only" is active, the layout engine can switch to an image-optimized arrangement (grid, size-sorted, date-sorted) instead of the default tree layout. That's the "new visualization of just those things" Wisdom called out.
+
+---
+
+### 2026-04-20 — (long-horizon) Claude Code conversations as canvas citizens, organized by project
+
+**Context:** Build-queue capture session. Wisdom flagged this as "much later" — contingent on Spatial Workspace becoming a proper editor with Claude Code integrated. Vision-level entry, not near-term buildable.
+**Idea:** Once Spatial Workspace is the editor surface and Claude Code runs inside it, **conversations become first-class citizens on the canvas**, organized under the project they belong to. From the canvas you can:
+- See all conversations that happened under a given project as nodes beside its files.
+- Find a past conversation by scanning the project spatially instead of querying a flat history list.
+- Resume a conversation by clicking its node — it opens back up live, in-context.
+**Why it matters:** Conversation history today lives in a separate plane from the project it produced (sessions/, Claude Code's internal transcript store, chronicle files, etc.). None of them are spatial. A user looking at the Spatial Workspace project on the canvas should be able to see *"these are the 12 conversations that built this thing"* alongside the files themselves. Conversations become a discoverable artifact of the project, not a disconnected log. Closes the loop between *the work* and *the thinking that produced it*.
+**Status:** Long-horizon. Depends on:
+- Claude Code being embeddable / runnable inside the workspace (convergence-era, see 2026-04-05 PS Bot pivot and Four-Project Convergence).
+- A conversation-to-project association layer (sessions/ per project is a start; chronicle entries partially cover this already).
+- The canvas rendering multiple node types (files, conversations, maybe also tasks/todos) — extends the 2026-04-20 multi-filetype entry conceptually.
+**Open question for later:** How are conversations represented visually — as a distinct node type (color/icon-coded), clustered under a per-project "conversations" folder, or interleaved with files in chronological context? Worth a design pass when this becomes actionable.
 
 ---
 

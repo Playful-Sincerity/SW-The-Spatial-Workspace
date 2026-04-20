@@ -185,6 +185,10 @@ def scan_directory(path, should_skip_dir, should_skip_file, cross_links, depth=0
         "children": [],
         "meta": {},
     }
+    try:
+        node["meta"]["mtime"] = path.stat().st_mtime
+    except OSError:
+        pass
 
     try:
         entries = sorted(path.iterdir(), key=lambda e: (not e.is_dir(), e.name.lower()))
@@ -218,6 +222,7 @@ def scan_directory(path, should_skip_dir, should_skip_file, cross_links, depth=0
                 stat = entry.stat()
                 file_node["meta"]["size"] = stat.st_size
                 file_node["meta"]["lines"] = None
+                file_node["meta"]["mtime"] = stat.st_mtime
 
                 if stat.st_size <= MAX_CONTENT_SIZE:
                     content = entry.read_text(encoding="utf-8", errors="replace")
@@ -233,6 +238,21 @@ def scan_directory(path, should_skip_dir, should_skip_file, cross_links, depth=0
             node["children"].append(file_node)
 
     return node
+
+
+def rollup_mtime(node):
+    """Set each directory's mtime to the max of its descendants' mtimes.
+    Filesystem dir mtime only reflects direct-child adds/removes, which
+    isn't useful; what we want is 'when was any descendant last touched.'"""
+    own = node.get("meta", {}).get("mtime") or 0
+    max_m = own
+    for child in node.get("children", []):
+        rollup_mtime(child)
+        cm = child.get("meta", {}).get("mtime") or 0
+        if cm > max_m:
+            max_m = cm
+    if max_m > 0:
+        node.setdefault("meta", {})["mtime"] = max_m
 
 
 def count_nodes(node):
@@ -391,9 +411,10 @@ def main():
     print(f"  .md files with content: {files_with_content}", file=sys.stderr)
     print(f"  Cross-links extracted: {len(cross_links)}", file=sys.stderr)
 
-    # [4/5] Attach status data
+    # [4/5] Attach status data + roll up mtimes for directories
     print("\n[4/5] Attaching project status...", file=sys.stderr)
     attach_status(tree, status_projects)
+    rollup_mtime(tree)
 
     # [5/5] Assemble HTML
     print("\n[5/5] Assembling HTML...", file=sys.stderr)

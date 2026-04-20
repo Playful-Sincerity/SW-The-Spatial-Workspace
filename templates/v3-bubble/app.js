@@ -24,6 +24,37 @@ const SETTINGS_DEFAULTS = {
   labelScale: 1.0,      // multiplier over the per-type design-spec font sizes
 };
 
+function loadExpandedPathsFromStorage() {
+  try {
+    const raw = localStorage.getItem("sw-expanded-paths");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? new Set(parsed) : null;
+  } catch (_) { return null; }
+}
+
+function saveExpandedPathsToStorage() {
+  try {
+    localStorage.setItem("sw-expanded-paths", JSON.stringify(Array.from(state.expandedPaths)));
+  } catch (_) {}
+}
+
+function loadZoomFromStorage() {
+  try {
+    const raw = localStorage.getItem("sw-zoom");
+    if (!raw) return null;
+    const v = JSON.parse(raw);
+    if (!v || !isFinite(v.x) || !isFinite(v.y) || !isFinite(v.k)) return null;
+    return v;
+  } catch (_) { return null; }
+}
+
+function saveZoomToStorage(transform) {
+  try {
+    localStorage.setItem("sw-zoom", JSON.stringify({ x: transform.x, y: transform.y, k: transform.k }));
+  } catch (_) {}
+}
+
 function loadSettings() {
   try {
     const saved = JSON.parse(localStorage.getItem("sw-settings") || "{}");
@@ -49,6 +80,7 @@ const state = {
   readerMinimized: false,
   layoutRoot: null,  // latest d3.hierarchy root (post-settle), for re-seed on expand
   maxTierExpanded: 1,  // tier+/- counter; N = expand every dir at depth < N
+  searchScope: null,   // when set, searches only match descendants of this folder path
 };
 
 // ── Constants ─────────────────────────────────────────────────────────
@@ -59,19 +91,49 @@ const INITIAL_EXPAND_DEPTH = 1;
 const INITIAL_EXPAND_BAG_THRESHOLD = 40;
 const ANIM_DURATION = 480;
 
-// Phase (from project-status.yaml) → activity heat token. Phase describes
-// project state; heat describes visual temperature. The mapping is ordinal:
-// active work → hot, resting → cold.
-const PHASE_TO_HEAT = {
-  active: "hot",
-  building: "hot",
-  design: "warm",
-  slow: "warm",
-  concept: "cool",
-  maintenance: "cool",
-  paused: "cold",
-  dormant: "cold",
+// Heat = recency of last edit anywhere in the subtree (rolled up by the
+// generator from descendant file mtimes). Thresholds in days, ordered
+// hottest → coolest; anything older than the last threshold gets no
+// heat color and falls back to the default border.
+const AGE_HEAT_DAYS = {
+  blaze: 1,    // edited today
+  hot:   3,    // last 3 days
+  warm:  7,    // last week
+  cool:  14,   // last 2 weeks
+  cold:  30,   // last month
+  // older than 30 days → no heat (falls back to default border)
 };
+
+function heatForMtime(mtimeSec) {
+  if (!mtimeSec) return null;
+  const ageMs = Date.now() - mtimeSec * 1000;
+  const ageDays = ageMs / (1000 * 60 * 60 * 24);
+  if (ageDays < 0) return "blaze"; // clock skew — treat as fresh
+  if (ageDays <= AGE_HEAT_DAYS.blaze) return "blaze";
+  if (ageDays <= AGE_HEAT_DAYS.hot)   return "hot";
+  if (ageDays <= AGE_HEAT_DAYS.warm)  return "warm";
+  if (ageDays <= AGE_HEAT_DAYS.cool)  return "cool";
+  if (ageDays <= AGE_HEAT_DAYS.cold)  return "cold";
+  return null;
+}
+
+function formatMtimeAge(mtimeSec) {
+  if (!mtimeSec) return "unknown";
+  const ageMs = Date.now() - mtimeSec * 1000;
+  const mins = Math.round(ageMs / 60000);
+  if (mins < 2) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  if (days < 14) return `${days}d ago`;
+  const weeks = Math.round(days / 7);
+  if (weeks < 8) return `${weeks}w ago`;
+  const months = Math.round(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  const years = (days / 365).toFixed(1);
+  return `${years}y ago`;
+}
 
 // Per-type button anatomy (Figma workshop, 2026-04-16).
 // padX = horizontal padding; height is fixed; minWidth is the floor.
@@ -130,8 +192,8 @@ function measureNode(d) {
 // special with the purple stroke. This matches the GitLab / Carbon / VS Code
 // pattern of "color must be paired with a second encoding or not used at all".
 function nodeVisual(d) {
-  const phase = d.data.meta && d.data.meta.phase;
-  const heat = phase ? PHASE_TO_HEAT[phase] : null;
+  const mtime = d.data.meta && d.data.meta.mtime;
+  const heat = heatForMtime(mtime);
   if (heat) {
     return {
       stroke: `var(--sw-heat-${heat})`,
@@ -338,9 +400,10 @@ function init() {
   CROSS_LINKS = ECOSYSTEM_DATA.crossLinks || [];
 
   if (typeof CONFIG !== "undefined" && CONFIG && CONFIG.label) {
-    const titleEl = document.getElementById("sw-title");
+    // Title stays as the app name ("Spatial Workspace"); subtitle shows the
+    // ecosystem label so the app identity and the content identity are
+    // distinct.
     const subEl = document.getElementById("sw-subtitle");
-    if (titleEl) titleEl.textContent = CONFIG.label;
     if (subEl) subEl.textContent = CONFIG.label;
     document.title = CONFIG.label + " — Spatial Workspace";
   }
@@ -349,6 +412,15 @@ function init() {
   computeTreeMaxDirDepth();
   setInitialExpanded(TREE, 0, INITIAL_EXPAND_DEPTH);
   state.maxTierExpanded = INITIAL_EXPAND_DEPTH;
+
+  // Restore expanded paths from the previous session so the watch-server
+  // auto-reload doesn't collapse everything back to initial.
+  const restored = loadExpandedPathsFromStorage();
+  if (restored && restored.size > 0) {
+    state.expandedPaths = new Set();
+    const validDirs = new Set(state.flatNodes.filter(n => n.type === "directory").map(n => n.path));
+    for (const p of restored) if (validDirs.has(p)) state.expandedPaths.add(p);
+  }
 
   const totalFiles = state.flatNodes.filter(n => n.type === "file").length;
   const totalDirs = state.flatNodes.filter(n => n.type === "directory").length;
@@ -570,8 +642,19 @@ function renderTree() {
   zoomBehavior.on("zoom", (event) => {
     outerG.attr("transform", event.transform);
     applyZoomCoupledSizing(event.transform.k);
+    saveZoomToStorage(event.transform);
   });
   svg.call(zoomBehavior);
+
+  // Apply persisted zoom BEFORE the first paint so reloads resume silently
+  // at the previous viewport instead of briefly showing the un-fitted tree
+  // and then transitioning to fit.
+  const savedZoom = loadZoomFromStorage();
+  if (savedZoom) {
+    const t = d3.zoomIdentity.translate(savedZoom.x, savedZoom.y).scale(savedZoom.k);
+    svg.call(zoomBehavior.transform, t);
+    _zoomRestoredFromStorage = true;
+  }
 
   updateTree();
 }
@@ -788,9 +871,59 @@ function centerOnNodeWithChildren(path, { duration = 400 } = {}) {
   svg.transition().duration(duration).call(zoomBehavior.transform, transform);
 }
 
+// Jump-to-cluster: zooms and pans so a target node and its immediate
+// neighborhood fill the viewport — used by "Show in canvas" (locate button)
+// where the user wants to SEE where something lives, even if they're
+// currently zoomed way out. Unlike centerOn* variants, this ignores the
+// current scale and always fits to the cluster bbox.
+function zoomToCluster(path, { includeChildren = false, duration = 500 } = {}) {
+  if (!g || !path || !state.layoutRoot) return;
+  const node = state.layoutRoot.descendants().find(d => d.data.path === path);
+  if (!node) return;
+
+  const targets = [node];
+  if (includeChildren && node.children && node.children.length > 0) {
+    targets.push(...node.children);
+  } else if (!includeChildren && node.parent) {
+    targets.push(node.parent);
+    if (node.parent.children) targets.push(...node.parent.children);
+  }
+
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const t of targets) {
+    const hw = (t.width || 0) / 2;
+    const hh = (t.height || 0) / 2;
+    if (t.x - hw < minX) minX = t.x - hw;
+    if (t.x + hw > maxX) maxX = t.x + hw;
+    if (t.y - hh < minY) minY = t.y - hh;
+    if (t.y + hh > maxY) maxY = t.y + hh;
+  }
+  const bboxCx = (minX + maxX) / 2;
+  const bboxCy = (minY + maxY) / 2;
+  const bboxW = Math.max(1, maxX - minX);
+  const bboxH = Math.max(1, maxY - minY);
+
+  const container = document.getElementById("canvas");
+  const w = container.clientWidth;
+  const h = container.clientHeight;
+  const padding = 80;
+  const fitScale = Math.min((w - padding * 2) / bboxW, (h - padding * 2) / bboxH);
+  // Cap at the zoomBehavior's extent (8) so small clusters actually zoom in.
+  const scale = Math.max(0.02, Math.min(fitScale, 8));
+
+  const gCx = w / 2;
+  const gCy = h / 2;
+  const tx = w / 2 - (gCx + bboxCx) * scale;
+  const ty = h / 2 - (gCy + bboxCy) * scale;
+
+  const transform = d3.zoomIdentity.translate(tx, ty).scale(scale);
+  svg.transition().duration(duration).call(zoomBehavior.transform, transform);
+}
+
 // ── Layout Orchestration ──────────────────────────────────────────────
 let _prevPositions = new Map();  // path → {x, y} — lets expand/collapse preserve placement
 let _firstRender = true;
+let _zoomRestoredFromStorage = false;
 
 async function updateTree({ isResettle = false } = {}) {
   const s = state.settings;
@@ -838,6 +971,7 @@ async function updateTree({ isResettle = false } = {}) {
   }
 
   state.layoutRoot = root;
+  saveExpandedPathsToStorage();
   renderLayout(root, { animate: !_firstRender });
 
   // Re-apply zoom-coupled sizing after the transition starts so the
@@ -852,7 +986,7 @@ async function updateTree({ isResettle = false } = {}) {
   if (_firstRender) {
     _firstRender = false;
     requestAnimationFrame(() => {
-      fitToView();
+      if (!_zoomRestoredFromStorage) fitToView();
       requestAnimationFrame(() => { window.SW_READY = true; });
     });
   }
@@ -1039,6 +1173,7 @@ function attachNodeHandlers(selection) {
       if (m.phase) text += `\nPhase: ${m.phase}`;
       if (m.momentum) text += ` · Momentum: ${m.momentum}`;
       if (m.next_action) text += `\nNext: ${m.next_action}`;
+      if (m.mtime) text += `\nEdited ${formatMtimeAge(m.mtime)}`;
       if (m.lines) text += `\n${m.lines} lines`;
       if (m.size) text += ` · ${(m.size / 1024).toFixed(0)} KB`;
     }
@@ -1091,6 +1226,15 @@ function buildContextMenuItems(d) {
       label: "Collapse fully",
       disabled: !isExpanded,
       action: () => collapseSubtree(d.data.path),
+    });
+    items.push({ separator: true });
+    items.push({
+      label: "Search in this folder",
+      action: () => enterFolderSearchScope(d.data.path),
+    });
+    items.push({
+      label: "List view",
+      action: () => openListView(d.data.path),
     });
     items.push({ separator: true });
   }
@@ -1254,6 +1398,108 @@ async function retreatSubtreeOneTierAndRender(folderPath) {
   updateTierButtons();
 }
 
+// List view: interactive folder-tree widget rendered in the reader panel.
+// Folders expand/collapse in place (caret toggles local state held on the
+// tab); file rows call openFile() so they land in a new reader tab. The
+// list view tab persists — clicking a file doesn't close it, just opens
+// alongside it. Similar feel to the VS Code sidebar.
+function openListView(folderPath) {
+  const folder = findCanonicalNode(TREE, folderPath);
+  if (!folder) return;
+
+  const listPath = `listview://${folderPath}`;
+  const existing = state.openTabs.findIndex(t => t.path === listPath);
+  const isNewSpawn = existing < 0;
+  if (existing >= 0) {
+    state.activeTabIndex = existing;
+  } else {
+    const synthetic = {
+      name: `${folder.name} — list`,
+      path: listPath,
+      type: "file",
+      content: null,
+      meta: {
+        synthetic: true,
+        listView: true,
+        folderPath: folderPath,
+        listViewExpanded: new Set([folderPath]),
+      },
+    };
+    state.openTabs.push(synthetic);
+    state.activeTabIndex = state.openTabs.length - 1;
+  }
+  state.readerMinimized = false;
+  renderTabs();
+  // Spawn the reader narrower for list view — it doesn't need markdown-width.
+  // Only on fresh spawn; if the user already has it open at some width, respect
+  // that. The inline style persists until the user drags the divider.
+  if (isNewSpawn) {
+    const reader = document.getElementById("reader");
+    if (reader) reader.style.width = "320px";
+  }
+  showActiveTab();
+  renderOpenFiles();
+}
+
+function renderListView(tab, container) {
+  const folder = findCanonicalNode(TREE, tab.meta.folderPath);
+  if (!folder) {
+    container.innerHTML = `<div class="sw-reader-empty">Folder not found</div>`;
+    return;
+  }
+  container.innerHTML = "";
+  const shell = document.createElement("div");
+  shell.className = "sw-listview";
+
+  const expanded = tab.meta.listViewExpanded;
+
+  const folderGlyph = `<svg class="sw-listview-glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4.5C2 3.67 2.67 3 3.5 3H6l1.5 1.5H12.5C13.33 4.5 14 5.17 14 6v5.5C14 12.33 13.33 13 12.5 13h-9C2.67 13 2 12.33 2 11.5v-7z" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>`;
+  const fileGlyph   = `<svg class="sw-listview-glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5C4 2.22 4.22 2 4.5 2h5l2.5 2.5v8.5c0 .28-.22.5-.5.5h-7a.5.5 0 0 1-.5-.5v-10z" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M9.5 2v2.5H12" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>`;
+  const caretDown = `<svg class="sw-listview-caret" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5L5 7 8 3.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const caretRight = `<svg class="sw-listview-caret" viewBox="0 0 10 10" aria-hidden="true"><path d="M3.5 2L7 5 3.5 8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+  function renderRow(node, depth) {
+    const row = document.createElement("div");
+    row.className = "sw-listview-row " + (node.type === "directory" ? "is-dir" : "is-file");
+    row.style.paddingLeft = `${depth * 12 + 6}px`;
+
+    const heat = heatForMtime(node.meta && node.meta.mtime);
+
+    if (node.type === "directory") {
+      const isExp = expanded.has(node.path);
+      row.innerHTML = `${isExp ? caretDown : caretRight}${folderGlyph}<span class="sw-listview-name">${escapeHtml(node.name)}</span>`;
+      row.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (isExp) expanded.delete(node.path);
+        else expanded.add(node.path);
+        renderListView(tab, container);
+      });
+      shell.appendChild(row);
+      if (isExp && node.children) {
+        for (const c of node.children) renderRow(c, depth + 1);
+      }
+    } else {
+      row.innerHTML = `<span class="sw-listview-caret-spacer"></span>${fileGlyph}<span class="sw-listview-name">${escapeHtml(node.name)}</span>`;
+      row.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const flat = state.flatNodes.find(n => n.path === node.path);
+        if (flat) openFile(flat);
+      });
+      shell.appendChild(row);
+    }
+
+    // Heat tint on the glyph — same color vocabulary as the canvas. SVG uses
+    // stroke=currentColor, so setting .color on the glyph element cascades.
+    if (heat) {
+      const glyph = row.querySelector(".sw-listview-glyph");
+      if (glyph) glyph.style.color = `var(--sw-heat-${heat})`;
+    }
+  }
+
+  renderRow(folder, 0);
+  container.appendChild(shell);
+}
+
 async function expandSubtreeFully(folderPath) {
   const folder = findCanonicalNode(TREE, folderPath);
   if (!folder) return;
@@ -1371,7 +1617,9 @@ function showActiveTab() {
 
   refreshSelectedStyling();
 
-  if (tab.content) {
+  if (tab.meta && tab.meta.listView) {
+    renderListView(tab, content);
+  } else if (tab.content) {
     try {
       content.innerHTML = marked.parse(tab.content);
       wireMarkdownLinks(content, tab);
@@ -1532,21 +1780,10 @@ function renderOpenFiles() {
   });
 }
 
-// Heat token for a file row: walks up its ancestors in the flatNodes index
-// and uses the nearest phase. Files inside an "active" project get hot, etc.
+// Heat token for a file row — same age→heat mapping as nodes. Uses the
+// file's own mtime if known.
 function heatTokenForTab(tab) {
-  if (tab.meta && tab.meta.phase && PHASE_TO_HEAT[tab.meta.phase]) {
-    return PHASE_TO_HEAT[tab.meta.phase];
-  }
-  const parts = tab.path.split("/");
-  for (let i = parts.length - 1; i > 0; i--) {
-    const ancestorPath = parts.slice(0, i).join("/");
-    const a = state.flatNodes.find(n => n.path === ancestorPath);
-    if (a && a.meta && a.meta.phase && PHASE_TO_HEAT[a.meta.phase]) {
-      return PHASE_TO_HEAT[a.meta.phase];
-    }
-  }
-  return null;
+  return heatForMtime(tab.meta && tab.meta.mtime);
 }
 
 // Shorten a long absolute path for the row subtitle — keeps the last 2 segments.
@@ -1647,16 +1884,136 @@ function updateSearchHighlight(query) {
   applySearchHighlight();
 }
 
-function commitSearch() {
+async function commitSearch({ action = "expand" } = {}) {
   if (!state.searchQuery) return;
   const q = state.searchQuery;
   const matches = state.flatNodes.filter(n => {
+    if (!matchesSearchScope(n.path)) return false;
     const nameMatch = n.name.toLowerCase().includes(q);
     const contentMatch = n.content && n.content.toLowerCase().includes(q);
     return nameMatch || contentMatch;
   });
-  for (const match of matches) expandAncestors(match.path);
-  updateTree({ isResettle: true });
+
+  const before = state.expandedPaths.size;
+  if (matches.length > 0) {
+    if (action === "expandFull") {
+      for (const m of matches) expandAncestors(m.path);
+    } else if (action === "collapse") {
+      // Progressive collapse: undo the deepest tier of path-to-match
+      // expansion. Mirrors `expand` — each Shift+Enter peels one tier.
+      const expanded = [];
+      for (const m of matches) {
+        const parts = m.path.split("/");
+        for (let i = 1; i < parts.length - 1; i++) {
+          const apath = parts.slice(0, i + 1).join("/");
+          if (!apath) continue;
+          const node = state.flatNodes.find(n => n.path === apath && n.type === "directory");
+          if (node && state.expandedPaths.has(apath)) {
+            expanded.push({ path: apath, depth: i });
+          }
+        }
+      }
+      if (expanded.length > 0) {
+        const maxDepth = expanded.reduce((m, e) => e.depth > m ? e.depth : m, -Infinity);
+        for (const e of expanded) {
+          if (e.depth === maxDepth) state.expandedPaths.delete(e.path);
+        }
+      }
+    } else {
+      // action === "expand": one tier deeper, globally. Find every
+      // unexpanded dir-ancestor across all matches, pick the shallowest
+      // depth, and open every unexpanded ancestor at that depth.
+      const unexpanded = [];
+      for (const m of matches) {
+        const parts = m.path.split("/");
+        for (let i = 1; i < parts.length - 1; i++) {
+          const apath = parts.slice(0, i + 1).join("/");
+          if (!apath) continue;
+          const node = state.flatNodes.find(n => n.path === apath && n.type === "directory");
+          if (node && !state.expandedPaths.has(apath)) {
+            unexpanded.push({ path: apath, depth: i });
+          }
+        }
+      }
+      if (unexpanded.length > 0) {
+        const minDepth = unexpanded.reduce((m, u) => u.depth < m ? u.depth : m, Infinity);
+        for (const u of unexpanded) {
+          if (u.depth === minDepth) state.expandedPaths.add(u.path);
+        }
+      }
+    }
+  }
+
+  const changed = state.expandedPaths.size !== before;
+  if (changed) {
+    _prevPositions = new Map();
+    await updateTree({ isResettle: true });
+  }
+  // Always reframe on Enter: even when nothing new was expanded (matches
+  // already visible, or no matches), the user pressed Enter expecting
+  // feedback. Fit-to-view reliably shows that Enter registered.
+  requestAnimationFrame(() => fitToView());
+  if (changed) updateTierButtons();
+}
+
+function shallowestUnexpandedAncestor(filePath) {
+  const parts = filePath.split("/");
+  for (let i = 1; i < parts.length - 1; i++) {
+    const ancestorPath = parts.slice(0, i + 1).join("/");
+    if (!ancestorPath) continue;
+    const node = state.flatNodes.find(n => n.path === ancestorPath && n.type === "directory");
+    if (node && !state.expandedPaths.has(ancestorPath)) return ancestorPath;
+  }
+  return null;
+}
+
+// ── Search Scope (search within a folder) ─────────────────────────────
+// Right-click a folder → "Search in this folder" sets state.searchScope to
+// that folder's path. Subsequent searches only match descendants of the
+// scoped folder. A chip in the search box shows the scope; clicking its X
+// clears it. Decouples the scope from the search query, so changing one
+// doesn't reset the other.
+function matchesSearchScope(path) {
+  if (!state.searchScope) return true;
+  return path === state.searchScope || path.startsWith(state.searchScope + "/");
+}
+
+function enterFolderSearchScope(folderPath) {
+  const node = state.flatNodes.find(n => n.path === folderPath);
+  if (!node) return;
+  state.searchScope = folderPath;
+  renderSearchScope();
+  const input = document.getElementById("search-input");
+  if (input) {
+    input.placeholder = `Search in ${node.name}`;
+    input.focus();
+    input.select();
+    if (state.searchQuery) updateSearchHighlight(state.searchQuery);
+  }
+}
+
+function clearSearchScope() {
+  state.searchScope = null;
+  renderSearchScope();
+  const input = document.getElementById("search-input");
+  if (input) {
+    input.placeholder = "Search the canvas";
+    if (state.searchQuery) updateSearchHighlight(state.searchQuery);
+  }
+}
+
+function renderSearchScope() {
+  const chip = document.getElementById("search-scope");
+  const label = document.getElementById("search-scope-label");
+  if (!chip || !label) return;
+  if (state.searchScope) {
+    const node = state.flatNodes.find(n => n.path === state.searchScope);
+    label.textContent = node ? node.name : state.searchScope;
+    chip.hidden = false;
+  } else {
+    label.textContent = "";
+    chip.hidden = true;
+  }
 }
 
 // ── Expand-All / Collapse-All ─────────────────────────────────────────
@@ -1722,10 +2079,36 @@ function collapseAllAtTier(tier) {
   })(TREE, 0);
 }
 
+// Walk the tree once and return both the frontier (unexpanded dirs whose
+// parent is expanded — the next tier down) and the deepest-expanded-dir set
+// (the current deepest tier — what minus would remove). Derived from actual
+// state each call, so it tracks manual click/menu expansions correctly.
+function surveyTierState() {
+  const frontier = []; // { path, depth }
+  let maxExpandedDepth = -1;
+  const expandedByDepth = new Map(); // depth → [paths]
+  (function walk(node, depth) {
+    if (!node || node.type !== "directory") return;
+    const hasChildren = node.children && node.children.length > 0;
+    if (state.expandedPaths.has(node.path)) {
+      if (depth > maxExpandedDepth) maxExpandedDepth = depth;
+      if (!expandedByDepth.has(depth)) expandedByDepth.set(depth, []);
+      expandedByDepth.get(depth).push(node.path);
+      if (hasChildren) for (const c of node.children) walk(c, depth + 1);
+    } else if (hasChildren) {
+      frontier.push({ path: node.path, depth });
+    }
+  })(TREE, 0);
+  return { frontier, maxExpandedDepth, expandedByDepth };
+}
+
 async function revealNextTier() {
-  if (state.maxTierExpanded >= TREE_MAX_DIR_DEPTH) return;
-  state.maxTierExpanded += 1;
-  expandAllAtTier(state.maxTierExpanded);
+  const { frontier } = surveyTierState();
+  if (frontier.length === 0) return;  // everything expanded
+  const minDepth = frontier.reduce((m, f) => f.depth < m ? f.depth : m, Infinity);
+  for (const f of frontier) {
+    if (f.depth === minDepth) state.expandedPaths.add(f.path);
+  }
   _prevPositions = new Map();
   await updateTree({ isResettle: true });
   requestAnimationFrame(() => fitToView());
@@ -1733,9 +2116,10 @@ async function revealNextTier() {
 }
 
 async function hideDeepestTier() {
-  if (state.maxTierExpanded <= 0) return;
-  state.maxTierExpanded -= 1;
-  collapseAllAtTier(state.maxTierExpanded);
+  const { maxExpandedDepth, expandedByDepth } = surveyTierState();
+  if (maxExpandedDepth < 0) return;  // nothing expanded
+  const paths = expandedByDepth.get(maxExpandedDepth) || [];
+  for (const p of paths) state.expandedPaths.delete(p);
   _prevPositions = new Map();
   await updateTree({ isResettle: true });
   requestAnimationFrame(() => fitToView());
@@ -1745,8 +2129,9 @@ async function hideDeepestTier() {
 function updateTierButtons() {
   const plus = document.getElementById("tier-plus-btn");
   const minus = document.getElementById("tier-minus-btn");
-  if (plus) plus.disabled = state.maxTierExpanded >= TREE_MAX_DIR_DEPTH;
-  if (minus) minus.disabled = state.maxTierExpanded <= 0;
+  const { frontier, maxExpandedDepth } = surveyTierState();
+  if (plus) plus.disabled = frontier.length === 0;
+  if (minus) minus.disabled = maxExpandedDepth < 0;
 }
 
 function expandAncestors(filePath) {
@@ -1763,8 +2148,9 @@ function applySearchHighlight() {
   g.selectAll(".node").each(function(d) {
     if (!d || !d.data) return;
     const el = d3.select(this);
-    const nameMatch = d.data.name.toLowerCase().includes(state.searchQuery);
-    const flatNode = state.flatNodes.find(n => n.path === d.data.path);
+    const inScope = matchesSearchScope(d.data.path);
+    const nameMatch = inScope && d.data.name.toLowerCase().includes(state.searchQuery);
+    const flatNode = inScope ? state.flatNodes.find(n => n.path === d.data.path) : null;
     const contentMatch = flatNode && flatNode.content &&
                          flatNode.content.toLowerCase().includes(state.searchQuery);
     if (nameMatch || contentMatch) {
@@ -1812,18 +2198,65 @@ function setupDivider() {
 // ── Events ────────────────────────────────────────────────────────────
 function setupEvents() {
   const searchInput = document.getElementById("search-input");
+  const searchBox = document.querySelector(".sw-search-box");
+  const searchClear = document.getElementById("search-clear");
+  const syncClearVisibility = (value) => {
+    if (searchBox) searchBox.classList.toggle("has-text", !!value);
+  };
   searchInput.addEventListener("input", (e) => {
+    syncClearVisibility(e.target.value);
     updateSearchHighlight(e.target.value);
   });
   searchInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
       updateSearchHighlight(e.target.value);
-      commitSearch();
+      const action = e.shiftKey ? "collapse"
+                   : e.metaKey  ? "expandFull"
+                   : "expand";
+      commitSearch({ action });
     }
   });
+  if (searchClear) {
+    searchClear.addEventListener("click", () => {
+      searchInput.value = "";
+      syncClearVisibility("");
+      updateSearchHighlight("");
+      searchInput.focus();
+    });
+  }
+  const scopeClear = document.getElementById("search-scope-clear");
+  if (scopeClear) scopeClear.addEventListener("click", clearSearchScope);
 
   document.getElementById("reader-close").addEventListener("click", minimizeReader);
+
+  const goToCanvasBtn = document.getElementById("go-to-canvas");
+  if (goToCanvasBtn) goToCanvasBtn.addEventListener("click", async () => {
+    const tab = state.openTabs[state.activeTabIndex];
+    if (!tab) return;
+    const isListView = tab.meta && tab.meta.listView && tab.meta.folderPath;
+    // Cluster = the parent folder (for file tabs) or the folder itself
+    // (for list-view tabs). We always frame a FOLDER + its children.
+    let clusterFolderPath;
+    if (isListView) {
+      clusterFolderPath = tab.meta.folderPath;
+    } else {
+      const lastSlash = tab.path.lastIndexOf("/");
+      clusterFolderPath = lastSlash > 0 ? tab.path.substring(0, lastSlash) : tab.path;
+    }
+    // Expand ancestors of the cluster folder, then the folder itself so its
+    // children become part of the layout (the "cluster" that gets framed).
+    const before = state.expandedPaths.size;
+    expandAncestors(clusterFolderPath);
+    const folderNode = state.flatNodes.find(n => n.path === clusterFolderPath && n.type === "directory");
+    if (folderNode) state.expandedPaths.add(clusterFolderPath);
+    if (state.expandedPaths.size !== before) {
+      _prevPositions = new Map();
+      await updateTree({ isResettle: true });
+    }
+    zoomToCluster(clusterFolderPath, { includeChildren: true });
+    updateTierButtons();
+  });
 
   document.getElementById("copy-path").addEventListener("click", () => {
     const tab = state.openTabs[state.activeTabIndex];
@@ -1868,6 +2301,8 @@ function setupEvents() {
         minimizeReader();
       } else {
         document.getElementById("search-input").value = "";
+        const sb = document.querySelector(".sw-search-box");
+        if (sb) sb.classList.remove("has-text");
         updateSearchHighlight("");
       }
       document.getElementById("settings-panel").classList.remove("open");
@@ -1960,6 +2395,13 @@ let liveReloadHash = null;
 
 function startLivePolling() {
   const dot = document.getElementById("live-dot");
+  if (dot && !dot.dataset.wired) {
+    dot.dataset.wired = "1";
+    dot.style.cursor = "pointer";
+    dot.addEventListener("click", () => {
+      if (dot.classList.contains("stale")) location.reload();
+    });
+  }
 
   async function poll() {
     try {
@@ -1970,15 +2412,18 @@ function startLivePolling() {
       if (liveReloadHash === null) {
         liveReloadHash = data.hash;
         dot.classList.add("live");
+        dot.classList.remove("stale");
         dot.title = `Live · last regen ${new Date(data.generated_at * 1000).toLocaleTimeString()}`;
       } else if (data.hash !== liveReloadHash) {
+        // Don't auto-reload — blacking out the screen every few seconds is
+        // worse than a stale page. Show a visible indicator instead and
+        // let the user click to reload when they're ready.
         dot.classList.remove("live");
-        dot.classList.add("refreshing");
-        dot.title = "Reloading…";
-        setTimeout(() => location.reload(), 250);
+        dot.classList.add("stale");
+        dot.title = "New data available — click to reload";
       }
     } catch (err) {
-      dot.classList.remove("live", "refreshing");
+      dot.classList.remove("live", "stale", "refreshing");
       dot.title = "Live updates not connected (run watch-server.py)";
     }
   }
