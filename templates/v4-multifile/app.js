@@ -1919,9 +1919,11 @@ async function showActiveTab() {
     return;
   }
 
+  // Fetch on demand if we don't already have content for this tab.
   if (tab.content == null) {
     content.innerHTML = `<div class="sw-reader-empty">Loading…</div>`;
     const fetched = await fetchFileContent(tab.path);
+    // Bail if user switched tabs while we were waiting.
     if (state.openTabs[state.activeTabIndex] !== tab) return;
     if (fetched == null) {
       content.innerHTML = `<div class="sw-reader-empty">Could not load content</div>`;
@@ -1930,13 +1932,33 @@ async function showActiveTab() {
     tab.content = fetched;
   }
 
-  try {
-    content.innerHTML = marked.parse(tab.content);
-    wireMarkdownLinks(content, tab);
-  } catch (e) {
-    content.innerHTML = `<pre>${escapeHtml(tab.content)}</pre>`;
+  const kind = (tab.meta && tab.meta.kind) || "markdown";
+  if (kind === "code") {
+    renderCode(tab, content);
+  } else {
+    try {
+      content.innerHTML = marked.parse(tab.content);
+      wireMarkdownLinks(content, tab);
+    } catch (e) {
+      content.innerHTML = `<pre>${escapeHtml(tab.content)}</pre>`;
+    }
   }
   content.scrollTop = 0;
+}
+
+function renderCode(tab, container) {
+  const lang = (tab.meta && tab.meta.lang) || "";
+  const pre = document.createElement("pre");
+  pre.className = "sw-code";
+  const code = document.createElement("code");
+  if (lang) code.className = "language-" + lang;
+  code.textContent = tab.content;
+  pre.appendChild(code);
+  container.innerHTML = "";
+  container.appendChild(pre);
+  if (typeof hljs !== "undefined") {
+    try { hljs.highlightElement(code); } catch (e) { /* fall back to plain monospace */ }
+  }
 }
 
 function refreshSelectedStyling() {

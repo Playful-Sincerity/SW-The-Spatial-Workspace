@@ -1,14 +1,24 @@
 # Spatial Workspace
 
-A living map of your markdown vault. Point it at a folder — your notes, your code repo, your Obsidian vault — and you get a radial canvas you can pan, zoom, search, and read from. Edit a file and the canvas updates itself.
+**A spatial interface for your whole computer, anchored in your Digital Core.**
 
-This is v2. It reads any configured set of roots, so you can share it with a teammate and they can run it on their own vault.
+Most software wants to be the place you keep things. Spatial Workspace is the opposite: it lives outside your projects and renders them — and eventually the conversations you have, the tools you use, the parts of the internet you work with — as a single radial canvas you can see, navigate, and operate from.
+
+Today, it's a daily-driver viewer of any markdown vault. Point it at a set of folders and you get a radial canvas you can pan, zoom, search, and read from, with live updates as you edit files. That's the working surface. The directional bet is bigger: the canvas becomes the place from which Claude Code sessions are run, files are edited, and adjacent computer interactions happen. Sessions and conversations as first-class spatial elements. The browser, Figma, Miro, Artifact, n8n — adjacent tools as nodes on the same canvas. Eventually the internet, anchored in spatial relationship rather than tab order.
+
+Spatial Workspace v1 is the canvas. v2 is the editor. v3 is the interface.
 
 ![screenshot placeholder — run `./run.sh` and `generator/screenshot.sh` to produce one]
 
-## What you get
+## Why spatial
 
-- **A canvas of your vault.** Folders are nodes, markdown files are leaves. Click a file to read it in a right-hand panel, click a markdown link inside to open a new tab, click empty canvas to minimize the reader.
+Trees encourage tree-thinking. Flat lists encourage priority-thinking. Force-directed graphs encourage chaos. Spatial layouts encourage **shape-thinking** — perception of the overall form of a body of work, not just its individual pieces. When you can see the whole shape of what you're doing, and when that shape updates as you work, you move differently through the work itself.
+
+Reading prompts is walking the streets. The diagram is seeing the city from above. Both are useful. This is the second one — and a bet that the second one belongs as the primary surface, not just a navigation aid alongside the first.
+
+## What you get today
+
+- **A canvas of your vault.** Folders as bubbles, markdown files as leaves. Click a file to read it in a right-hand panel, click a markdown link inside to open a new tab, click empty canvas to minimize the reader.
 - **Live updates.** While `./run.sh` is running, edits you make in your editor show up on the canvas within a few seconds.
 - **Trackpad-native.** Two-finger scroll to pan, pinch to zoom (anchored at your cursor), search with `⌘F`.
 - **Config-driven.** One `config.json`, any vault, any time.
@@ -34,6 +44,9 @@ First run creates `config.json` from `config.example.json`. Edit the `roots` arr
 
 # Without opening a browser (useful on a remote box)
 ./run.sh --no-open
+
+# Use an alternate config (scope the canvas to a subset of projects)
+./run.sh --config config-peermesh-ruflo.json
 ```
 
 Stop the server with `Ctrl-C`.
@@ -63,7 +76,7 @@ Stop the server with `Ctrl-C`.
 - `roots` — one entry per top-level branch of the canvas. Supports `~`.
 - `branchColors` — tints per branch (optional; defaults to a neutral warm tone).
 - `statusColors` — colors for the "ambient status" border/tint on project nodes that carry phase metadata. All keys optional; missing keys fall back to a built-in palette.
-- `statusYaml` — optional path to a flat YAML listing projects with `path` and `phase` fields (see `~/claude-system/docs/project-status.yaml` in Wisdom's setup for the shape). Set to `null` if you don't have one.
+- `statusYaml` — optional path to a flat YAML listing projects with `path` and `phase` fields. Set to `null` if you don't have one.
 - `exclude` — directory names (not paths) to skip anywhere in the tree. Dotfiles and `.DS_Store` are always skipped.
 
 Missing paths don't break the canvas — they're warned and skipped. Change any field, save, and the watch-server regenerates on the next tick.
@@ -92,10 +105,13 @@ The canvas signals when it's ready for capture via `window.SW_READY`, so the PNG
 ## What's under the hood
 
 - `generator/generate-ecosystem.py` — scans the configured roots, reads markdown content into memory, extracts cross-links, and assembles a single self-contained HTML file.
-- `generator/watch-server.py` — serves the HTML, polls the filesystem for `.md` changes, re-runs the generator on change, and lets the open page auto-reload.
-- `generator/config.py` — JSON config loader + validator (pure stdlib).
-- `templates/v2/` — the HTML skeleton, CSS, JS, and vendored D3 + marked libraries. The generator concatenates these on each build.
-- `tests/test_config.py` — stdlib-only tests for the config layer. Run with `python3 -m unittest tests.test_config`.
+- `generator/generate-ecosystem-v4.py` — multifile variant with non-`.md` filetype support and syntax highlighting.
+- `generator/watch-server.py` — serves the HTML, polls the filesystem for changes, re-runs the generator on change, lets the open page auto-reload, and serves file content lazily via `/content?path=` with strict root validation.
+- `generator/config.py` — JSON config loader and validator (pure stdlib).
+- `templates/v3-bubble/` — current production template (D3 circle packing with absolute-radius sizing). Other variants (`v2/`, `v3-tree/`, `v4-multifile/`) live alongside for comparison or specialized use.
+- `tests/test_config.py` — stdlib-only tests for the config layer.
+
+The output is a single self-contained HTML file at `~/ecosystem-canvas.html` (in the running user's HOME, not the author's). With lazy content loading enabled (default), initial payload is around 8.8 MB for a ~10,000-node vault.
 
 ## Tests
 
@@ -103,9 +119,21 @@ The canvas signals when it's ready for capture via `window.SW_READY`, so the PNG
 python3 -m unittest tests.test_config
 ```
 
+## Where this is going
+
+The current canvas is read-only — your viewer of a body of work. The next horizon is **operability**: editing files inside the canvas, running Claude Code sessions as first-class spatial elements (with the full Playful Sincerity Digital Core methodology layer preserved — hooks, rules, skills, MEMORY.md, the full set of slash commands), and bringing adjacent computer surfaces into the same spatial frame. After that, the same approach extends outward to web — different conversations, different tabs, different tools, all held in spatial relationship rather than buried in tab bars and browser history.
+
+The thesis: when you operate your computer from a spatial canvas anchored in your Digital Core, the work changes. You hold more in view. You move between contexts by location rather than by recall. The shape of what you're doing becomes the interface to it.
+
+For the per-component current state, see [`STATUS.md`](STATUS.md). For the development arc that produced this version, see [`history/HISTORY.md`](history/HISTORY.md). For the most current positioning, see [`concept-paper/2026-04-23-spatial-workspace-concept.md`](concept-paper/2026-04-23-spatial-workspace-concept.md).
+
 ## Project context
 
-Spatial Workspace is part of [Playful Sincerity](https://playfulsincerity.com) — a home for warm, experimental, rigorous work. The idea behind this tool is that spatial interfaces are often clearer than linear ones. Reading your files one by one is walking the streets. Seeing them all on a canvas is seeing the city from above. Both are useful. This is the second one.
+Spatial Workspace is part of [Playful Sincerity](https://playfulsincerity.com) — a multidisciplinary research and software ecosystem grounded in the union of warmth and rigor. It's the first publicly shareable instance of the Playful Sincerity Digital Core's Universal Interface thesis: that filesystem plus AI agents plus visible spatial structure is what a general cognitive interface looks like.
+
+CoVibe — multiplayer Claude Code coordination — is a sibling project, with its own repo at `~/Playful Sincerity/PS Software/CoVibe/` ([GitHub: Playful-Sincerity/covibe](https://github.com/Playful-Sincerity/covibe)). Its long-horizon plan includes integrating as the collaborative-editing layer beneath the spatial canvas.
+
+The `covibe/` directory in this project is design-phase historical archive from when CoVibe incubated alongside Spatial Workspace; the canonical source of truth lives in CoVibe's own repo.
 
 ---
 

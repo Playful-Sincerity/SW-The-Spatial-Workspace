@@ -30,6 +30,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.parse
 import webbrowser
 from pathlib import Path
 
@@ -41,7 +42,8 @@ from config import load_config, ConfigError  # noqa: E402
 
 HOME = Path.home()
 SPEC_DIR = SCRIPT_DIR.parent
-GENERATOR = SCRIPT_DIR / "generate-ecosystem.py"
+DEFAULT_GENERATOR = SCRIPT_DIR / "generate-ecosystem.py"
+GENERATOR = DEFAULT_GENERATOR  # overridden by --generator at startup
 OUTPUT = HOME / "ecosystem-canvas.html"
 
 # Populated at startup from the loaded config.
@@ -175,6 +177,8 @@ class CanvasHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith("/__snapshot.json"):
             self._serve_snapshot()
+        elif self.path.startswith("/content"):
+            self._serve_content()
         elif self.path == "/" or self.path == "/index.html":
             self._serve_canvas()
         else:
@@ -210,6 +214,74 @@ class CanvasHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    # Optimization A (2026-04-23): file content is no longer embedded in the
+    # canvas payload. The frontend fetches it on demand from this endpoint
+    # when a tab is opened. Path is validated against WATCH_ROOTS so we can't
+    # be tricked into serving arbitrary filesystem content (e.g., /etc/passwd).
+    def _serve_content(self):
+        MAX_CONTENT_BYTES = 500 * 1024  # mirrors generator's MAX_CONTENT_SIZE
+
+        parsed = urllib.parse.urlparse(self.path)
+        params = urllib.parse.parse_qs(parsed.query)
+        raw_path = (params.get("path") or [""])[0]
+        if not raw_path:
+            self.send_error(400, "missing 'path' parameter")
+            return
+
+        try:
+            target = Path(os.path.expanduser(raw_path)).resolve()
+        except (OSError, ValueError):
+            self.send_error(400, "invalid path")
+            return
+
+        # Confine to configured roots — must live under at least one of them.
+        allowed = False
+        for root in WATCH_ROOTS:
+            try:
+                target.relative_to(root.resolve())
+                allowed = True
+                break
+            except ValueError:
+                continue
+        if not allowed:
+            self.send_error(403, "path not in any configured root")
+            return
+
+        if not target.exists() or not target.is_file():
+            self.send_error(404, "file not found")
+            return
+
+        try:
+            size = target.stat().st_size
+            if size > MAX_CONTENT_BYTES:
+                # Truncate large files rather than 413 — reader will show what we have
+                with open(target, "rb") as f:
+                    raw = f.read(MAX_CONTENT_BYTES)
+            else:
+                with open(target, "rb") as f:
+                    raw = f.read()
+        except (PermissionError, OSError) as e:
+            self.send_error(500, f"read failed: {e}")
+            return
+
+        # Decode as UTF-8 with errors=replace so binary-ish files still return
+        # something the frontend can display in a <pre> block.
+        try:
+            text = raw.decode("utf-8", errors="replace")
+        except Exception:
+            text = ""
+        body = text.encode("utf-8")
+
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        if size > MAX_CONTENT_BYTES:
+            self.send_header("X-Truncated", "true")
+        self.end_headers()
+        self.wfile.write(body)
+
 
 class ThreadedServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     daemon_threads = True
@@ -219,7 +291,7 @@ class ThreadedServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
-    global WATCH_ROOTS, EXCLUDE_DIRS, CONFIG_PATH, TEMPLATE_PATH, OUTPUT
+    global WATCH_ROOTS, EXCLUDE_DIRS, CONFIG_PATH, TEMPLATE_PATH, OUTPUT, GENERATOR
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=8765)
@@ -227,8 +299,15 @@ def main():
     parser.add_argument("--no-open", action="store_true")
     parser.add_argument("--config", help="Path to config.json (defaults to ./config.json, then built-in).")
     parser.add_argument("--template", help="Template directory (e.g. templates/v2-dynamic-alt). Defaults to generator's built-in v2/.")
+    parser.add_argument("--generator", help=f"Generator script (default: {DEFAULT_GENERATOR.name}). Use generate-ecosystem-v4.py with the v4-multifile template.")
     parser.add_argument("--output", help="Output HTML path. Defaults to ~/ecosystem-canvas.html, or auto-named from --template if that's set.")
     args = parser.parse_args()
+
+    if args.generator:
+        GENERATOR = Path(args.generator).expanduser().resolve()
+        if not GENERATOR.exists():
+            print(f"[config] Generator not found: {GENERATOR}", file=sys.stderr)
+            sys.exit(1)
 
     try:
         cfg = load_config(args.config)

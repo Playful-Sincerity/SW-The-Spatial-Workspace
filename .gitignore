@@ -1,0 +1,40 @@
+# --- Personal working state (kept locally; not for public repo) ---
+chronicle/
+knowledge/
+ideas/
+dreams/
+play/
+research/
+debates/
+sessions/
+concept-paper/
+design/
+archive/
+covibe/
+
+# Personal portfolio narrative (kept locally)
+history/
+archive-highlights.md
+plan.md
+
+# User-specific config (use config.example.json as the starting point)
+config.json
+config-peermesh-ruflo.json
+
+# Generated output (lives in $HOME, not the project tree, but belt-and-suspenders)
+ecosystem-canvas.html
+sw-canvas.png
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
