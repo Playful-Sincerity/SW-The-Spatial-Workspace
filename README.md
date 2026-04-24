@@ -12,9 +12,11 @@ Spatial Workspace v1 is the canvas. v2 is the editor. v3 is the interface.
 
 ## Why spatial
 
-Trees encourage tree-thinking. Flat lists encourage priority-thinking. Force-directed graphs encourage chaos. Spatial layouts encourage **shape-thinking** — perception of the overall form of a body of work, not just its individual pieces. When you can see the whole shape of what you're doing, and when that shape updates as you work, you move differently through the work itself.
+The reason is simple: everything needs to go spatial. Putting things in lines, stacked on top of each other, doesn't utilize the full meaning that two-dimensionality can express. We work on 2D screens, and we keep collapsing them into 1D scrollable lists — leaving most of the available expression on the table.
 
-Reading prompts is walking the streets. The diagram is seeing the city from above. Both are useful. This is the second one — and a bet that the second one belongs as the primary surface, not just a navigation aid alongside the first.
+Spatial layout uses both axes. Your file structure shows up as structure — clusters, distances, density. Related work sits visibly near related work. Already in daily use, this has been concretely useful for understanding projects, finding files, and seeing where attention is concentrated. Discoverability is massively improved. Focusing on one area without losing the rest of the picture becomes natural.
+
+Reading files one at a time is walking the streets. The canvas is seeing the city from above. Both are useful — the bet is that the second one belongs as the primary surface, not just a navigation aid.
 
 ## What you get today
 
@@ -121,7 +123,7 @@ python3 -m unittest tests.test_config
 
 ## Where this is going
 
-The current canvas is read-only — your viewer of a body of work. The next horizon is **operability**: editing files inside the canvas, running Claude Code sessions as first-class spatial elements (with the full Playful Sincerity Digital Core methodology layer preserved — hooks, rules, skills, MEMORY.md, the full set of slash commands), and bringing adjacent computer surfaces into the same spatial frame. After that, the same approach extends outward to web — different conversations, different tabs, different tools, all held in spatial relationship rather than buried in tab bars and browser history.
+The current canvas is read-only — your viewer of a body of work. The next horizon is **operability**: editing files inside the canvas, running Claude Code sessions and conversations as first-class spatial elements that can interact with each other and with the files around them (with the full Playful Sincerity Digital Core methodology layer preserved — hooks, rules, skills, MEMORY.md, the full set of slash commands), and bringing adjacent computer surfaces into the same spatial frame. After that, the same approach extends outward to web — different conversations, different tabs, different tools, all held in spatial relationship rather than buried in tab bars and browser history.
 
 The thesis: when you operate your computer from a spatial canvas anchored in your Digital Core, the work changes. You hold more in view. You move between contexts by location rather than by recall. The shape of what you're doing becomes the interface to it.
 
