@@ -8,7 +8,7 @@ Today, it's a daily-driver viewer of any markdown vault. Point it at a set of fo
 
 Spatial Workspace v1 is the canvas. v2 is the editor. v3 is the interface.
 
-![screenshot placeholder — run `./run.sh` and `generator/screenshot.sh` to produce one]
+![Spatial Workspace canvas rendering the Playful Sincerity Digital Core — three vault roots, ~10,000 nodes, radial bubble-pack layout](docs/screenshot.png)
 
 ## Why spatial
 
