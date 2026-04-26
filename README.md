@@ -16,6 +16,8 @@ The reason is simple: everything needs to go spatial. Putting things in lines, s
 
 Spatial layout uses both axes. Your file structure shows up as structure — clusters, distances, density. Related work sits visibly near related work. Already in daily use, this has been concretely useful for understanding projects, finding files, and seeing where attention is concentrated. Discoverability is massively improved. Focusing on one area without losing the rest of the picture becomes natural.
 
+In practice: a well-developed knowledge base accumulates many thousands of files across many projects. Linear file viewers — VS Code's tree, Finder, Obsidian's sidebar — become unusable at that scale; finding the right file means recalling the right path. The canvas inverts that. You navigate by location, not by name. Spatial Workspace has become the author's default file finder over VS Code's tree for daily work, simply because it scales.
+
 Reading files one at a time is walking the streets. The canvas is seeing the city from above. Both are useful — the bet is that the second one belongs as the primary surface, not just a navigation aid.
 
 ## What you get today
